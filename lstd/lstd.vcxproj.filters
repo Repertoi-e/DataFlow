@@ -1,0 +1,330 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="lstd">
+      <UniqueIdentifier>{FC409A7C-E877-9B0D-9164-81107D7A170F}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="lstd\file">
+      <UniqueIdentifier>{CB796206-37E4-167D-8022-C822ECCBF4D1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="lstd\fmt">
+      <UniqueIdentifier>{32E5A5D1-1EB2-00DD-47CB-EE8433F7356B}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="lstd\internal">
+      <UniqueIdentifier>{C8BEE25B-347F-5E92-FDB9-A70F6939A36E}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="lstd\io">
+      <UniqueIdentifier>{6345FD91-CF24-7C2D-D83C-0704449BE28E}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="lstd\math">
+      <UniqueIdentifier>{752F6606-E199-1A7D-2AD8-CB229681F8D1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="lstd\math\transforms">
+      <UniqueIdentifier>{13726B64-FF00-F52D-A81F-0929948D05D4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="lstd\memory">
+      <UniqueIdentifier>{0499F438-704E-6D2E-F942-670565F76332}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="lstd\types">
+      <UniqueIdentifier>{C0E1B7D3-AC99-F920-15A1-D27C01789411}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\lstd\file.h">
+      <Filter>lstd</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\file\catalog.h">
+      <Filter>lstd\file</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\file\handle.h">
+      <Filter>lstd\file</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\file\path.h">
+      <Filter>lstd\file</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\fmt.h">
+      <Filter>lstd</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\fmt\arg.h">
+      <Filter>lstd\fmt</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\fmt\debug.h">
+      <Filter>lstd\fmt</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\fmt\format_context.h">
+      <Filter>lstd\fmt</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\fmt\parse_context.h">
+      <Filter>lstd\fmt</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\fmt\specs.h">
+      <Filter>lstd\fmt</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\fmt\text_style.h">
+      <Filter>lstd\fmt</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\fmt\value.h">
+      <Filter>lstd\fmt</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\internal\common.h">
+      <Filter>lstd\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\internal\context.h">
+      <Filter>lstd\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\internal\debug_break.h">
+      <Filter>lstd\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\internal\floating_point.h">
+      <Filter>lstd\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\internal\namespace.h">
+      <Filter>lstd\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\internal\os_function_call.h">
+      <Filter>lstd\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\internal\scalar_functions.h">
+      <Filter>lstd\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\io.h">
+      <Filter>lstd</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\io\buffer_writer.h">
+      <Filter>lstd\io</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\io\console_writer.h">
+      <Filter>lstd\io</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\io\counting_writer.h">
+      <Filter>lstd\io</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\io\string_writer.h">
+      <Filter>lstd\io</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\io\writer.h">
+      <Filter>lstd\io</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\math.h">
+      <Filter>lstd</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\math\decompose_lu.h">
+      <Filter>lstd\math</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\math\decompose_qr.h">
+      <Filter>lstd\math</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\math\geometry.h">
+      <Filter>lstd\math</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\math\mat.h">
+      <Filter>lstd\math</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\math\mat_func.h">
+      <Filter>lstd\math</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\math\mat_util.h">
+      <Filter>lstd\math</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\math\no_init.h">
+      <Filter>lstd\math</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\math\quat.h">
+      <Filter>lstd\math</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\math\quat_func.h">
+      <Filter>lstd\math</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\math\quat_util.h">
+      <Filter>lstd\math</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\math\rect.h">
+      <Filter>lstd\math</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\math\simd.h">
+      <Filter>lstd\math</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\math\simd_sse2.h">
+      <Filter>lstd\math</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\math\transforms\identity.h">
+      <Filter>lstd\math\transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\math\transforms\orthographic.h">
+      <Filter>lstd\math\transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\math\transforms\perspective.h">
+      <Filter>lstd\math\transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\math\transforms\rotation_2d.h">
+      <Filter>lstd\math\transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\math\transforms\rotation_3d.h">
+      <Filter>lstd\math\transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\math\transforms\scale.h">
+      <Filter>lstd\math\transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\math\transforms\shear.h">
+      <Filter>lstd\math\transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\math\transforms\translation.h">
+      <Filter>lstd\math\transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\math\transforms\view.h">
+      <Filter>lstd\math\transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\math\transforms\zero.h">
+      <Filter>lstd\math\transforms</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\math\vec.h">
+      <Filter>lstd\math</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\math\vec_func.h">
+      <Filter>lstd\math</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\math\vec_util.h">
+      <Filter>lstd\math</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\memory\allocator.h">
+      <Filter>lstd\memory</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\memory\array.h">
+      <Filter>lstd\memory</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\memory\array_like.h">
+      <Filter>lstd\memory</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\memory\bucket_array.h">
+      <Filter>lstd\memory</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\memory\delegate.h">
+      <Filter>lstd\memory</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\memory\dynamic_library.h">
+      <Filter>lstd\memory</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\memory\free_list_allocator.h">
+      <Filter>lstd\memory</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\memory\guid.h">
+      <Filter>lstd\memory</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\memory\hash.h">
+      <Filter>lstd\memory</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\memory\hash_table.h">
+      <Filter>lstd\memory</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\memory\hasher.h">
+      <Filter>lstd\memory</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\memory\signal.h">
+      <Filter>lstd\memory</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\memory\stack_array.h">
+      <Filter>lstd\memory</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\memory\stack_dynamic_buffer.h">
+      <Filter>lstd\memory</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\memory\string.h">
+      <Filter>lstd\memory</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\memory\string_builder.h">
+      <Filter>lstd\memory</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\memory\string_utils.h">
+      <Filter>lstd\memory</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\os.h">
+      <Filter>lstd</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\parse.h">
+      <Filter>lstd</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\platform.h">
+      <Filter>lstd</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\thread.h">
+      <Filter>lstd</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\types\basic_types.h">
+      <Filter>lstd\types</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\types\compare.h">
+      <Filter>lstd\types</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\types\math_types.h">
+      <Filter>lstd\types</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\types\numeric_info.h">
+      <Filter>lstd\types</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\types\sequence.h">
+      <Filter>lstd\types</Filter>
+    </ClInclude>
+    <ClInclude Include="src\lstd\types\type_info.h">
+      <Filter>lstd\types</Filter>
+    </ClInclude>
+    <ClInclude Include="src\pch.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\lstd\file\catalog.cpp">
+      <Filter>lstd\file</Filter>
+    </ClCompile>
+    <ClCompile Include="src\lstd\file\path.cpp">
+      <Filter>lstd\file</Filter>
+    </ClCompile>
+    <ClCompile Include="src\lstd\fmt.cpp">
+      <Filter>lstd</Filter>
+    </ClCompile>
+    <ClCompile Include="src\lstd\fmt\debug.cpp">
+      <Filter>lstd\fmt</Filter>
+    </ClCompile>
+    <ClCompile Include="src\lstd\fmt\format_context.cpp">
+      <Filter>lstd\fmt</Filter>
+    </ClCompile>
+    <ClCompile Include="src\lstd\fmt\parse_context.cpp">
+      <Filter>lstd\fmt</Filter>
+    </ClCompile>
+    <ClCompile Include="src\lstd\internal\internal.cpp">
+      <Filter>lstd\internal</Filter>
+    </ClCompile>
+    <ClCompile Include="src\lstd\memory\allocator.cpp">
+      <Filter>lstd\memory</Filter>
+    </ClCompile>
+    <ClCompile Include="src\lstd\memory\default_allocator.cpp">
+      <Filter>lstd\memory</Filter>
+    </ClCompile>
+    <ClCompile Include="src\lstd\memory\free_list_allocator.cpp">
+      <Filter>lstd\memory</Filter>
+    </ClCompile>
+    <ClCompile Include="src\lstd\memory\string.cpp">
+      <Filter>lstd\memory</Filter>
+    </ClCompile>
+    <ClCompile Include="src\lstd\memory\string_builder.cpp">
+      <Filter>lstd\memory</Filter>
+    </ClCompile>
+    <ClCompile Include="src\lstd\memory\temporary_allocator.cpp">
+      <Filter>lstd\memory</Filter>
+    </ClCompile>
+    <ClCompile Include="src\pch.cpp" />
+    <ClCompile Include="src\windows_common.cpp" />
+    <ClCompile Include="src\windows_crash_handler.cpp" />
+    <ClCompile Include="src\windows_error.cpp" />
+    <ClCompile Include="src\windows_file.cpp" />
+    <ClCompile Include="src\windows_thread.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\lstd\fmt\colors.def">
+      <Filter>lstd\fmt</Filter>
+    </None>
+    <None Include="src\lstd\fmt\terminal_colors.def">
+      <Filter>lstd\fmt</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="lstd.natvis" />
+  </ItemGroup>
+</Project>
