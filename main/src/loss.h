@@ -2,19 +2,6 @@
 
 #include "pch.h"
 
-// This is to silence annoying errors, these don't fire if you define them before including this file.
-#ifndef INPUT_SHAPE
-#define INPUT_SHAPE 1
-#endif
-
-#ifndef N_TRAIN_EXAMPLES_PER_STEP
-#define N_TRAIN_EXAMPLES_PER_STEP 1
-#endif
-
-#ifndef OUTPUT_NEURONS
-#define OUTPUT_NEURONS 1
-#endif
-
 using LossesMat = matf<OUTPUT_NEURONS, N_TRAIN_EXAMPLES_PER_STEP>;
 
 struct loss_function {

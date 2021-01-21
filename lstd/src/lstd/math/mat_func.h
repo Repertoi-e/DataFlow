@@ -21,7 +21,7 @@ template <typename T, typename U, s64 R1, s64 Match, s64 C2, bool Packed>
 inline mat<T, R1, C2, Packed> dot(const mat<T, R1, Match, Packed>& lhs, const mat<U, Match, C2, Packed>& rhs) {
 	if constexpr (R1 == 4 && Match == 4 && C2 == 4 && types::is_same<T, f32> && types::is_same<U, f32>) {
 		using V = mat_mul_elem_t<T, U>;
-		mat<V, 4, 4, Packed> result = { no_init };
+		mat<V, 4, 4, Packed> result;
 
 		__m128 row[4], sum[4];
 		for (s32 i = 0; i < 4; i++) row[i] = _mm_load_ps((f32*)&rhs.Stripes[i]);
@@ -40,7 +40,7 @@ inline mat<T, R1, C2, Packed> dot(const mat<T, R1, Match, Packed>& lhs, const ma
 		}
 		else {
 			using V = mat_mul_elem_t<T, U>;
-			mat<V, R1, C2, Packed> result = { no_init };
+			mat<V, R1, C2, Packed> result;
 			for (s64 i = 0; i < R1; ++i) {
 				result.Stripes[i] = rhs.Stripes[0] * lhs(i, 0);
 			}
@@ -170,7 +170,7 @@ T det(const mat<T, Dim, Dim, Packed>& m) {
 // Transposes the matrix in-place
 template <typename T_, s64 R, s64 C, bool Packed>
 mat<T_, C, R, Packed> T(const mat<T_, R, C, Packed>& m) {
-	mat<T_, C, R, Packed> result = { no_init };
+	mat<T_, C, R, Packed> result;
 	for (s64 i = 0; i < m.R; ++i) {
 		for (s64 j = 0; j < m.C; ++j) result(j, i) = m(i, j);
 	}
@@ -180,7 +180,7 @@ mat<T_, C, R, Packed> T(const mat<T_, R, C, Packed>& m) {
 // Returns the inverse of a 2x2 matrix
 template <typename T, bool Packed>
 auto inverse(const mat<T, 2, 2, Packed>& m) {
-	mat<T, 2, 2, Packed> result = { no_init };
+	mat<T, 2, 2, Packed> result;
 
 	const auto& r0 = m.Stripes[0];
 	const auto& r1 = m.Stripes[1];
@@ -197,7 +197,7 @@ auto inverse(const mat<T, 2, 2, Packed>& m) {
 // Returns the inverse of a 3x3 matrix
 template <typename T, bool Packed>
 auto inverse(const mat<T, 3, 3, Packed>& m) {
-	mat<T, 3, 3, Packed> result = { no_init };
+	mat<T, 3, 3, Packed> result;
 
 	using Vec3 = vec<T, 3, false>;
 
@@ -236,7 +236,7 @@ auto inverse(const mat<T, 3, 3, Packed>& m) {
 // Returns the inverse of a 4x4 matrix
 template <typename T, bool Packed>
 auto inverse(const mat<T, 4, 4, Packed>& m) {
-	mat<T, 4, 4, Packed> result = { no_init };
+	mat<T, 4, 4, Packed> result;
 
 	using Vec3 = vec<T, 3, false>;
 	using Vec4 = vec<T, 4, false>;
@@ -334,12 +334,12 @@ auto inverse(const mat<T, 4, 4, Packed>& m) {
 // Returns the inverse of the matrix
 template <typename T, s64 Dim, bool Packed>
 mat<T, Dim, Dim, Packed> inverse(const mat<T, Dim, Dim, Packed>& m) {
-	mat<T, Dim, Dim, Packed> result = { no_init };
+	mat<T, Dim, Dim, Packed> result;
 
 	auto lup = decompose_lup(m);
 
 	vec<T, Dim, Packed> b(0);
-	vec<T, Dim, Packed> x = { no_init };
+	vec<T, Dim, Packed> x;
 	for (s64 col = 0; col < Dim; ++col) {
 		b[max<s64>(0, col - 1)] = 0;
 		b[col] = 1;

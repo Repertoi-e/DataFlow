@@ -6,9 +6,10 @@
     <ClInclude Include="src\activation.h" />
     <ClInclude Include="src\dyn_mat.h" />
     <ClInclude Include="src\loss.h" />
+    <ClInclude Include="src\architecture.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\pch.cpp" />
-    <ClCompile Include="src\main_mnist.cpp" />
+    <ClCompile Include="src\main_or_gate.cpp" />
   </ItemGroup>
 </Project>

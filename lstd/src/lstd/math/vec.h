@@ -4,7 +4,6 @@
 
 #include "../memory/array.h"
 #include "../memory/string_utils.h"
-#include "no_init.h"
 #include "simd.h"
 #include "swizzle_1.inl"
 #include "swizzle_2.inl"
@@ -203,17 +202,8 @@ struct vec : public vec_data<T_, Dim, Packed> {
     static constexpr bool IS_ARRAY_LIKE = true;
     static constexpr s64 Count = DIM;
 
-    vec() {
-        // By default we zero-init
-        if constexpr (types::is_scalar<T>) {
-            zero_memory(&this->Data[0], Dim * sizeof(T));
-        } else {
-            For(range(DIM)) this->Data[it] = T(0);
-        }
-    }
-
-    // :MathTypesNoInit By default we zero-init but you can call a special constructor with the value no_init which doesn't initialize the object
-    vec(no_init_t) : vec_data<T, DIM, PACKED>() {}
+    // :MathTypesNoInit By default we don't init (to save on performance) but you can call a constructor with a scalar value of 0 to zero-init.
+    vec() : vec_data<T, DIM, PACKED>() {}
 
     // Sets all elements to the same value
     explicit vec(T all) {

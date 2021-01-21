@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdlib.h> // @DependencyCleanup rand()
+
 #include "../internal/common.h"
 #include "../types/sequence.h"
 #include "array_like.h"
@@ -34,6 +36,25 @@ constexpr void quick_sort(T *first, T *last) {
     auto *nextPivot = quick_sort_partition(first, last, pivot);
     quick_sort(first, nextPivot);
     quick_sort(nextPivot + 1, last);
+}
+
+// An implementation of Fisher–Yates shuffle algorithm.
+// 
+// Uses rand() which is seeded by srand().
+// @TODO @Robustness In the future we should write a system for random number generators.
+template <typename T>
+constexpr void shuffle(T* first, T* last)
+{
+    s64 n = last - first;
+    For(range(n - 1, -1, -1)) {
+        // Pick a random index from 0 to i
+        s64 j = rand() % (it + 1);
+     
+        // Swap 
+        T temp = first[it];
+        first[it] = first[j];
+        first[j] = temp;
+    }
 }
 
 template <typename T>

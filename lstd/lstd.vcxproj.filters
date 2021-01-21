@@ -126,9 +126,6 @@
     <ClInclude Include="src\lstd\math\mat_util.h">
       <Filter>lstd\math</Filter>
     </ClInclude>
-    <ClInclude Include="src\lstd\math\no_init.h">
-      <Filter>lstd\math</Filter>
-    </ClInclude>
     <ClInclude Include="src\lstd\math\quat.h">
       <Filter>lstd\math</Filter>
     </ClInclude>

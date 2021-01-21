@@ -168,7 +168,7 @@ requires(vec_info<Vec>::DIM == 3) Vec cross(const stack_array<const Vec*, 2>& ar
 template <any_vec Vec>
 always_inline Vec element_wise_min(const Vec& lhs, const Vec& rhs)
 {
-    Vec result = { no_init };
+    Vec result;
     For(range(Vec::DIM)) result[it] = min(lhs[it], rhs[it]);
     return result;
 }
@@ -177,7 +177,7 @@ always_inline Vec element_wise_min(const Vec& lhs, const Vec& rhs)
 template <any_vec Vec>
 always_inline Vec element_wise_max(const Vec& lhs, const Vec& rhs)
 {
-    Vec result = { no_init };
+    Vec result;
     For(range(Vec::DIM)) result[it] = max(lhs[it], rhs[it]);
     return result;
 }
@@ -194,7 +194,7 @@ always_inline Vec element_wise_clamp(const Vec& arg, typename vec_info<Vec>::T l
 template <any_vec Vec>
 always_inline Vec element_wise_log(const Vec& vec)
 {
-    Vec result = { no_init };
+    Vec result;
     For(range(Vec::DIM)) result[it] = log(vec[it]);
     return result;
 }
@@ -203,7 +203,7 @@ always_inline Vec element_wise_log(const Vec& vec)
 template <any_vec Vec>
 always_inline Vec element_wise_exp(const Vec& vec)
 {
-    Vec result = { no_init };
+    Vec result;
     For(range(Vec::DIM)) result[it] = exp(vec[it]);
     return result;
 }
@@ -211,7 +211,7 @@ always_inline Vec element_wise_exp(const Vec& vec)
 template <any_vec Vec>
 always_inline Vec element_wise_abs(const Vec& vec)
 {
-    Vec result = { no_init };
+    Vec result;
     For(range(Vec::DIM)) result[it] = abs(vec[it]);
     return result;
 }
@@ -231,8 +231,8 @@ always_inline auto sum(const Vec& vec)
 template <any_vec Vec>
 Vec cross(const stack_array<const Vec*, vec_info<Vec>::DIM - 1>& args)
 {
-    Vec result = { no_init };
-    mat<typename Vec::T, Vec::DIM - 1, Vec::DIM - 1, false> d = { no_init };
+    Vec result;
+    mat<typename Vec::T, Vec::DIM - 1, Vec::DIM - 1, false> d;
 
     // Calculate elements of result on-by-one
     s64 sign = 2 * (Vec::DIM % 2) - 1;

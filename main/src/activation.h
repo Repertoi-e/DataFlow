@@ -1,83 +1,80 @@
 #pragma once
 
-template <s64 Dim>
-struct activation {
-    // Applies the activation function to a single value.
-    virtual f32 apply(f32 x) = 0;
+// Note: We provide so much overloads because we will vectorize in the future!
 
-    virtual void apply(vecf<Dim>& v)
-    {
-        For(v) it = apply(it); // @Performance @Math
-    }
+struct activation_none {
+    // Applies the activation function to a single value.
+    static f32 apply(f32 x) { return x; }
+
+    // Applies the activation function (in place) to a vector of arbitrary dimension.
+    // This is usually a set of neurons.
+    template <s64 Dim>
+    static void apply(vecf<Dim>& v) { return; }
+
+    // Applies the activation function (in place) to a matrix of arbitrary dimension.
+    // This is usually the _Out_ matrix with _R_ neurons and _C_ training samples.
+    template <s64 R, s64 C>
+    static void apply(mat_view<f32, R, C>& m) { return; }
+
+    // Gets the derivative of the activation function given the neuron outputs _a_.
+    // These should not include the bias term.
+    //
+    // Derivative of identify function is 1
+    template <s64 R, s64 C>
+    static matf<R, C> get_derivative(const mat_view<f32, R, C>& a) { return matf<R, C>(1.0f); }
+};
+
+struct activation_sigmoid {
+    static f32 apply(f32 x) { return 1.0f / (1.0f + expf(-x)); }
+
+    template <s64 Dim>
+    static void apply(vecf<Dim>& v) { return 1.0f / (1.0f + element_wise_exp(v)); }
 
     template <s64 R, s64 C>
-    void apply(mat_view<f32, R, C>& m)
-    {
-        For_as(i, range(R)) For_as(j, range(C)) m(i, j) = apply(m(i, j)); // @Performance @Math
-    }
-
-    using mat_out_t = matf<Dim + 1, N_TRAIN_EXAMPLES_PER_STEP>;
-    using mat_d_t = matf<Dim, N_TRAIN_EXAMPLES_PER_STEP>;
-
-    virtual mat_d_t get_derivative(const mat_out_t& t) = 0;
-};
-
-template <s64 NumNeurons>
-struct activation_func_none : activation<NumNeurons> {
-    f32 apply(f32 x) override { return x; }
-
-    // Derivative of identity function is 1
-    activation::mat_d_t get_derivative(const activation::mat_out_t& x) override
-    {
-        return activation::mat_d_t(1.0f);
-    }
-};
-
-template <s64 NumNeurons>
-struct activation_func_sigmoid : activation<NumNeurons> {
-    f32 apply_single(f32 x) override { return 1 / (1 + expf(-x)); }
+    static void apply(mat_view<f32, R, C>& m) { For(m.Stripes) apply(it); }
 
     // Derivative of sigmoid is s(x)(1 - s(x))
-    activation::mat_d_t get_derivative(const activation::mat_out_t& x) override
-    {
-        return (x * (activation::mat_out_t(1.0f) - x)).get_view<NumNeurons, N_TRAIN_EXAMPLES_PER_STEP>(1, 0);
-    }
+    template <s64 R, s64 C>
+    static matf<R, C> get_derivative(const mat_view<f32, R, C>& a) { return (a * (matf<R, C>(1.0f) - a)); }
 };
 
-template <s64 NumNeurons>
-struct activation_func_relu : activation<NumNeurons> {
-    // @Performance We can optimize this by looking at the sign bit
-    f32 apply_single(f32 x) override { return max(0, x); }
+// @Performance We can optimize this by looking at the sign bit
+struct activation_relu {
+    static f32 apply(f32 x) { return max(0, x); }
 
-    // Derivative of RELU is 1 when x is non-negative and 0 otherwise
-    activation::mat_d_t get_derivative(const activation::mat_out_t& x) override
+    template <s64 Dim>
+    static void apply(vecf<Dim>& v) { For(v) it = max(0, it); }
+
+    template <s64 R, s64 C>
+    static void apply(mat_view<f32, R, C>& m) { For(m.Stripes) apply(it); }
+
+    // Derivative of sigmoid is s(x)(1 - s(x))
+    template <s64 R, s64 C>
+    static matf<R, C> get_derivative(const mat_view<f32, R, C>& a)
     {
-        activation::mat_d_t result = { no_init };
-        For(range(1, NumNeurons))
-        {
-            // @Performance We can optimize this by looking at the sign bit
-            For_enumerate_as(x_index, xx, x.Stripes[it])
-            {
-                result(it - 1, x_index) = (f32)(xx >= 0);
-            }
-        }
+        matf<R, C> result = a;
+        For(result.Stripes) it = max(0, it) / it;
         return result;
     }
 };
 
-template <s64 NumNeurons>
-struct activation_func_softmax : activation<NumNeurons> {
-    f32 apply_single(f32 x) override { assert(false && "Cannot apply softmax to a single value"); }
+struct activation_softmax {
+    static f32 apply(f32 x) { assert(false && "Cannot apply softmax on a single value. This is probably a mistake."); }
 
-    virtual void apply(vecf<Dim>& v)
+    template <s64 Dim>
+    static void apply(vecf<Dim>& v)
     {
+        // We -max(v) to be more numerically stable
         auto e = element_wise_exp(v - element_wise_max(v));
         return e / sum(e);
     }
 
-    // Derivative of softmax is s(x)(1 - s(x))
-    activation::mat_d_t get_derivative(const activation::mat_out_t& x) override
+    template <s64 R, s64 C>
+    static void apply(mat_view<f32, R, C>& m) { For(m.Stripes) apply(it); }
+
+    // Derivative of sigmoid is s(x)(1 - s(x))
+    template <s64 R, s64 C>
+    static matf<R, C> get_derivative(const mat_view<f32, R, C>& a)
     {
-        // auto result = (x * (activation::mat_out_t(1.0f) - x)).get_view<NumNeurons, N_TRAIN_EXAMPLES_PER_STEP>(1, 0);
     }
 };

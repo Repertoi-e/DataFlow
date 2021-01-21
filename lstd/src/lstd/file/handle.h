@@ -110,7 +110,7 @@ struct handle {
     }
 
     struct read_entire_file_result {
-        bytes Content;
+        array<byte> Content;
         bool Success;
     };
 

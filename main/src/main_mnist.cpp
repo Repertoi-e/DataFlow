@@ -1,35 +1,36 @@
 #include "pch.h"
 
-constexpr s64 INPUT_SHAPE = 28 * 28;
-constexpr s64 OUTPUT_NEURONS = 10;
+#include "architecture.h"
 
-constexpr auto ARCHITECTURE = to_stack_array(INPUT_SHAPE, 128, 64, 32, OUTPUT_NEURONS);
+//
+// We define this
+//
 
 constexpr s64 N_TRAIN_EXAMPLES_PER_STEP = 1000;
 
-#include "model.h"
+constexpr auto ARCHITECTURE = std::make_tuple(
+    input<28 * 28> {},
+    dense<128, activation_sigmoid> {},
+    dense<64, activation_sigmoid> {},
+    dense<32, activation_sigmoid> {},
+    dense<10, activation_softmax> {});
 
-auto get_layers()
-{
-    stack_array<base_layer*, ARCHITECTURE.Count> layers;
+//
+// This is infered:
+//
 
-    ARCHITECTURE.Count;
+using ARCHITECTURE_T = decltype(ARCHITECTURE);
+constexpr s64 ARCHITECTURE_COUNT = std::tuple_size_v<ARCHITECTURE_T>;
 
-    static_for<0, ARCHITECTURE.Count>([](auto i) {
-        layers[i] = new dense_layer<dense_layer_neuron_info{1, 2}>(new activation_func_relu<128>));
-    });
+constexpr s64 INPUT_SHAPE = std::tuple_element_t<0, ARCHITECTURE_T>::NUM_NEURONS;
+constexpr s64 OUTPUT_NEURONS = std::tuple_element_t<ARCHITECTURE_COUNT - 1, ARCHITECTURE_T>::NUM_NEURONS;
 
-    array<base_layer*>
-        layers;
-    append(layers, new dense_layer<architecture[0]>(new activation_func_relu<128>));
-    append(layers, new dense_layer<architecture[1]>(new activation_func_relu<64>));
-    append(layers, new dense_layer<architecture[2]>(new activation_func_relu<32>));
-    append(layers, new dense_layer<architecture[3]>(new activation_func_softmax<OUTPUT_NEURONS>));
-    return layers;
-}
+#include "model.h" // Include this after architecture has been defined. Sadly I don't think there is a way around this!
 
 s32 main()
 {
+    Context.AllocAlignment = 16; // For SIMD
+
     // To ensure optimal performace we allocate all the memory we need next to
     // each other. We use an arena allocator to do that. If it does not have
     // enough space it falls back to regular malloc. So we need to make sure that
@@ -37,64 +38,122 @@ s32 main()
     //
     // After running once we can use: Context.TempAllocData.TotalUsed; to see how
     // much memory we've actually used. Just put a number bigger than that here.
-    allocate_array(byte, 1_MiB, Context.Temp);
+    allocate_array(byte, 300_MiB, Context.Temp);
     free_all(Context.Temp);
 
-    Context.AllocAlignment = 16; // For SIMD
+    string dataFolder = path::join(os_get_working_dir(), "data");
 
-    srand((u32)time(NULL));
-
-    // Deterministic initialization
-    // srand(42);
-
-    //
-    // We attempt to train an XOR gate:
-    //
-    // [0, 0] -> 0
-    // [1, 0] -> 1
-    // [0, 1] -> 1
-    // [1, 1] -> 0
-    //
-    auto input = to_stack_array<f32>(0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 1.0f);
-    auto targets = to_stack_array<f32>(0.0f, 1.0f, 1.0f, 0.0f);
-
-    model m;
+    auto trainImagesFile = file::handle(path::join(dataFolder, "train-images.idx3-ubyte"));
+    auto trainLabelsFile = file::handle(path::join(dataFolder, "train-labels.idx1-ubyte"));
 
     WITH_ALLOC(Context.Temp)
     {
-        m = compile_model({ .Layers = get_layers(), .LearningRate = 5.0f, .Loss = BinaryCrossEntropy });
-        fit_model(m, { .X = input, .y = targets, .Epochs = 500 });
-    }
+        s64 numItems;
 
-    // Here we generate random validation data..
-    const s64 VAL_SAMPLES = 50;
+        // Here we read the file, transform into floats, and scale all in one go.
+        array<f32> images;
+        {
+            auto [trainImagesBytes, success] = trainImagesFile.read_entire_file();
+            assert(success);
 
-    stack_array<f32, VAL_SAMPLES * INPUT_SHAPE> val_input;
-    stack_array<vecf<OUTPUT_NEURONS>, VAL_SAMPLES> val_targets;
+            defer(free(trainImagesBytes));
 
-    For(range(VAL_SAMPLES))
-    {
-        s32 a = rand() % 2, b = rand() % 2;
+            auto* p = trainImagesBytes.Data;
+            assert(p[0] == 0 && p[1] == 0 && p[2] == 8 && p[3] == 3); // Magic number 0x00000803
+            p += 4;
 
-        val_input[it * 2] = (f32)a;
-        val_input[it * 2 + 1] = (f32)b;
+            numItems = p[0] << 24 | p[1] << 16 | p[2] << 8 | p[3];
+            p += 4;
 
-        // val_targets[it] = (f32) (a ^ b);
-    }
+            p += 4 + 4; // the file includes the number of rows and columns
 
-    auto predicted = predict(m, val_input);
+            reserve(images, numItems * INPUT_SHAPE);
+            images.Count = numItems * INPUT_SHAPE; // @Dirty!
 
-    s64 score = 0;
-    For_enumerate(predicted)
-    {
-        For_as(x, it) x = (x > 0.5f) ? 1.0f : 0.0f;
-        if (it == val_targets[it_index]) {
-            score += 1;
+            For(range(numItems))
+            {
+                For_as(r, range(28)) For_as(c, range(28)) images[it * INPUT_SHAPE + (r * 28 + c)] = (f32)(p[r * 28 + c]) / 255.0f;
+                p += INPUT_SHAPE;
+            }
         }
-    }
-    fmt::print("{}, accuracy: {}\n", predicted, (f32)score / VAL_SAMPLES);
 
-    fmt::print("{} bytes memory used\n", Context.TempAllocData.TotalUsed);
+        // Here we read the file, transform into floats, and do one-hot encoding in one go.
+        array<f32> labels;
+        {
+            auto [trainLabelsBytes, success] = trainLabelsFile.read_entire_file();
+            assert(success);
+
+            defer(free(trainLabelsBytes));
+
+            auto* p = trainLabelsBytes.Data;
+            assert(p[0] == 0 && p[1] == 0 && p[2] == 8 && p[3] == 1); // Magic number 0x00000801
+            p += 4;
+
+            s32 numItems2 = p[0] << 24 | p[1] << 16 | p[2] << 8 | p[3];
+            assert(numItems2 == numItems); // Sanity!
+            p += 4;
+
+            reserve(labels, numItems * OUTPUT_NEURONS);
+            labels.Count = numItems * OUTPUT_NEURONS; // @Dirty!
+
+            For(range(numItems))
+            {
+                auto oneHot = vecf<OUTPUT_NEURONS>(0.0f);
+                oneHot[*p++] = 1;
+                copy_memory(&labels[it * OUTPUT_NEURONS], &oneHot, OUTPUT_NEURONS * sizeof(f32));
+            }
+        }
+
+        // srand((u32)time(NULL));
+
+        // Deterministic initialization
+        srand(42);
+
+        model m = compile_model({ .LearningRate = 5.0f, .Loss = BinaryCrossEntropy });
+
+        // @TODO Lot's of boilerplate when working with different types in C++. We should make this easier!
+        dyn_mat X, y;
+        X.Data = images;
+        X.R = numItems;
+        X.C = INPUT_SHAPE;
+        
+        y.Data = labels;
+        y.R = numItems;
+        y.C = OUTPUT_NEURONS;
+
+        fit(m, { .X = X, .y = y, .Epochs = 200 });
+
+        fmt::print("{} images, {} labels, {} bytes memory used\n", images.Count, labels.Count, Context.TempAllocData.TotalUsed);
+    }
+    //
+    // // Here we generate random validation data..
+    // const s64 VAL_SAMPLES = 50;
+    //
+    // stack_array<f32, VAL_SAMPLES * INPUT_SHAPE> val_input;
+    // stack_array<vecf<OUTPUT_NEURONS>, VAL_SAMPLES> val_targets;
+    //
+    // For(range(VAL_SAMPLES))
+    // {
+    //     s32 a = rand() % 2, b = rand() % 2;
+    //
+    //     val_input[it * 2] = (f32)a;
+    //     val_input[it * 2 + 1] = (f32)b;
+    //
+    //     // val_targets[it] = (f32) (a ^ b);
+    // }
+    //
+    // auto predicted = predict(m, val_input);
+    //
+    // s64 score = 0;
+    // For_enumerate(predicted)
+    // {
+    //     For_as(x, it) x = (x > 0.5f) ? 1.0f : 0.0f;
+    //     if (it == val_targets[it_index]) {
+    //         score += 1;
+    //     }
+    // }
+    // fmt::print("{}, accuracy: {}\n", predicted, (f32)score / VAL_SAMPLES);
+    //
 
     return 0;
 }

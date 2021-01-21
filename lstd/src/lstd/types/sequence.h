@@ -76,4 +76,10 @@ struct reverse_integer_sequence<integer_sequence<Head, Indices...>> {
     using type = typename merge_integer_sequence<typename reverse_integer_sequence<integer_sequence<Indices...>>::type, integer_sequence<Head>>::type;
 };
 
+template<typename T, T... Elements> constexpr T get_nth_element_of_sequence(sequence<T, Elements...>, s64 n)
+{
+    constexpr T arr[] = { Elements... };
+    return arr[n];
+}
+
 LSTD_END_NAMESPACE
