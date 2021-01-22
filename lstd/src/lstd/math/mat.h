@@ -6,10 +6,14 @@
 LSTD_BEGIN_NAMESPACE
 
 template <typename MatrixT>
-struct mat_info_helper {};
+struct mat_info_helper {
+    static constexpr bool IS_MAT = false;
+};
 
 template <typename T_, s64 R_, s64 C_, bool Packed_>
 struct mat_info_helper<mat<T_, R_, C_, Packed_>> {
+    static constexpr bool IS_MAT = true;
+
     using T = T_;
 
     static constexpr s64 R = R_;
@@ -19,6 +23,11 @@ struct mat_info_helper<mat<T_, R_, C_, Packed_>> {
 
 template <typename MatrixT>
 struct mat_info : public mat_info_helper<types::decay_t<MatrixT>> {};
+
+// @TODO: Use this inplace of templates.
+// I guess we did this for vectors but not fully for matrices.
+template <typename T>
+concept any_mat = mat_info<T>::IS_MAT;
 
 template <typename T, typename U>
 using mat_mul_elem_t = decltype(T() * U() + T() * U());

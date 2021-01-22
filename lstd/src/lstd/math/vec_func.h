@@ -182,6 +182,7 @@ always_inline Vec element_wise_max(const Vec& lhs, const Vec& rhs)
     return result;
 }
 
+// Clamps each vector value with specified bounds
 template <any_vec Vec>
 always_inline Vec element_wise_clamp(const Vec& arg, typename vec_info<Vec>::T lower, typename vec_info<Vec>::T upper)
 {
@@ -190,7 +191,7 @@ always_inline Vec element_wise_clamp(const Vec& arg, typename vec_info<Vec>::T l
     return result;
 }
 
-// Returns the element-wise log of the arguments
+// Returns the element-wise log of the vector
 template <any_vec Vec>
 always_inline Vec element_wise_log(const Vec& vec)
 {
@@ -199,7 +200,7 @@ always_inline Vec element_wise_log(const Vec& vec)
     return result;
 }
 
-// Returns the element-wise exp of the arguments
+// Returns the element-wise exp of the vector
 template <any_vec Vec>
 always_inline Vec element_wise_exp(const Vec& vec)
 {
@@ -208,6 +209,7 @@ always_inline Vec element_wise_exp(const Vec& vec)
     return result;
 }
 
+// Returns the element-wise abs of the vector
 template <any_vec Vec>
 always_inline Vec element_wise_abs(const Vec& vec)
 {

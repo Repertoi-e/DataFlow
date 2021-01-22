@@ -7,6 +7,7 @@
     <ClInclude Include="src\dyn_mat.h" />
     <ClInclude Include="src\loss.h" />
     <ClInclude Include="src\architecture.h" />
+    <ClInclude Include="src\runtime_layer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\pch.cpp" />

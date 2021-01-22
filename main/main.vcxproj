@@ -161,6 +161,7 @@
     <ClInclude Include="src\loss.h" />
     <ClInclude Include="src\model.h" />
     <ClInclude Include="src\pch.h" />
+    <ClInclude Include="src\runtime_layer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main_xor_gate.cpp" />

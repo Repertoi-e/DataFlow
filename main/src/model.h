@@ -1,155 +1,8 @@
 #pragma once
 
-#include "pch.h"
-
-// Unrolls a loop at compile-time
-template <s64 First, s64 Last, typename Lambda>
-void static_for(Lambda&& f)
-{
-    if constexpr (First < Last) {
-        f(types::integral_constant<s64, First> {});
-        static_for<First + 1, Last>(f);
-    }
-}
-
-#include "activation.h"
-#include "loss.h"
-
 #include "dyn_mat.h"
-
-using BatchInputMat = matf<INPUT_SHAPE + 1, N_TRAIN_EXAMPLES_PER_STEP>;
-using BatchOutputMat = matf<OUTPUT_NEURONS, N_TRAIN_EXAMPLES_PER_STEP>;
-
-struct base_layer_runtime {
-    virtual void initialize_weights() {};
-
-    virtual void feedforward(void* input) {};
-
-    virtual void calculate_delta(void* next_layer_delta_weighted) {};
-
-    virtual void update_weights(f32 learning_rate) {};
-};
-
-//
-// NOTE!
-//
-// We require the model architecture to be known at compile-time so we can (and
-// the compiler) do optimizations which otherwise wouldn't be possible. Since we
-// plan on calling C++ from Python, one can be sophisticated and actually
-// write a Python script which places a runtime parameter in the source code
-// and compiles the program, and then calls it from Python.
-//
-// That way we get the best of both worlds. Python is king
-// when it comes to automatization, C++ is king in performance.
-//
-//
-// For the math we use the following notation:
-//
-// Input: X        with shape i
-// Targets: y      with shape k
-// Predicted: y~
-//
-// Layer 1 has j neurons - a_j.
-//
-// Weights from input to layer 1: W_ji  (for jth neuron, with ith input)
-//
-// Layer 2 has k neurons - a_k.
-// .. and so on.
-//
-// So the flow for a two layer architecture is this:
-// X -> Z_j = W_ji * X + b_j
-//   -> A_j = f1(Z_j)
-//   -> Z_k = W_kj * A_j + b_k
-//   -> A_k = f2(Z_k)
-//   -> y~ = A_k
-//
-// Where f1 and f2 are activation functions.
-//
-// Loss is calculated using y and y~.
-//
-// For backpropagation:
-//   We calculate the cost derivative and pass that to calculate_delta for the output layer.
-//   Each layer calculates its own Delta and DeltaWeigthed (where DeltaWeighted is just Delta
-//   multiplied by the Weights between that layer and the previous).
-//   DeltaWeighted is then passed to the previous layer and so on.
-//
-//   The change in weights is just: dot(Delta, T(In)) / N_TRAIN_EXAMPLES_PER_STEP,
-//   where In is the input to this layer which is cached (we actually don't copy it but store
-//   it just as a pointer to _Out_ of the previous layer, since we know that while backpropagating
-//   we wouldn't mess with the outputs of neurons).
-//
-// Beautiful illustration: https://miro.medium.com/max/2400/1*dx2AYvXVyPZ38TAiPeD9Aw.jpeg <3
-//
-template <s64 NumInputs, s64 NumNeurons, typename _Activation>
-struct dense_layer_runtime : base_layer_runtime {
-    static constexpr s64 NUM_INPUTS = NumInputs;
-    static constexpr s64 NUM_NEURONS = NumNeurons;
-
-    using Activation = _Activation;
-
-    matf<NUM_NEURONS, NUM_INPUTS + 1> Weights; // +1 for the bias term
-
-    void initialize_weights() override
-    {
-        For_as(stripe, Weights.Stripes)
-        {
-            // 32767 is the max value of rand()
-            For(stripe) it = ((f32)rand() / (32767 / 2)) - 1; // Generate a value between - 1 and 1... @Robustness, This is ugly and bad
-        }
-    }
-
-    // The following are the cached variables that are used while training. These change from epoch to epoch.
-    // When used later for prediction, these don't matter (only the weights matter).
-
-    matf<NUM_INPUTS + 1, N_TRAIN_EXAMPLES_PER_STEP>* In = null;
-
-    // _Out_ is the output of each neuron for each training example.
-    matf<NUM_NEURONS + 1, N_TRAIN_EXAMPLES_PER_STEP> Out;
-
-    // _Delta_ is calculated as:
-    //    f'(Out) * cost_derivative              (when neurons are output for the model)
-    //    f'(Out) * Delta_weighted,next_layer    (when neurons are hidden)
-    //
-    // Where f' is the derivative of the activation function.
-    matf<NUM_NEURONS, N_TRAIN_EXAMPLES_PER_STEP> Delta;
-
-    // This is passed to the previous layer when doing backpropagation.
-    // We do this in this layer because we already have the Delta and the Weights,
-    // so we don't have to supply the weights to the previous layer.
-    //
-    // It is calculated by just dot(T(Weights), Delta).
-    matf<NUM_INPUTS, N_TRAIN_EXAMPLES_PER_STEP> DeltaWeighted;
-};
-
-template <s64 I>
-using _ATE = std::tuple_element_t<I, ARCHITECTURE_T>;
-
-template <s64 I>
-struct dense_layer_runtime_lookup {
-    using type = typename dense_layer_runtime<_ATE<I - 1>::NUM_NEURONS, _ATE<I>::NUM_NEURONS, typename _ATE<I>::Activation>;
-};
-
-// We specialize for the layer at index "0" (the input layer). TECHNICALLY we can't interpret that layer as a dense_layer since
-// it doesn't play any role in the architecture other than to specify the input shape. Nevertheless we can treat it as a dense
-// layer with no inputs and no activation in order to simplify our code later. Once we add more types of layers we should
-// really stop refering to this as a "dense layer lookup".
-template <>
-struct dense_layer_runtime_lookup<0> {
-    using type = dense_layer_runtime<1, _ATE<0>::NUM_NEURONS, decltype(void())>;
-};
-
-// We specialize for the layer at index "ARCHITECTURE_COUNT" (the POST output layer). TECHNICALLY we can't interpret that layer 
-// as a dense_layer since because it makes no sense. Nevertheless we can treat it as a dense layer which has a _DeltaWeighted_
-// which has the same type as the derivative of our cost function. This simplifies our code in the training loop. Once we add 
-// more types of layers we should really stop refering to this as a "dense layer lookup".
-template <>
-struct dense_layer_runtime_lookup<ARCHITECTURE_COUNT> {
-    using type = dense_layer_runtime<_ATE<ARCHITECTURE_COUNT - 1>::NUM_NEURONS, 1, decltype(void())>;
-};
-
-// Short-hand. Returns the proper templated type of dense_layer_runtime without having to do ARCHITECTURE each time.
-template <s64 I>
-using DLR_T = typename dense_layer_runtime_lookup<I>::type;
+#include "loss.h"
+#include "runtime_layer.h"
 
 struct model {
     array<base_layer_runtime*> Layers;
@@ -161,27 +14,6 @@ struct model {
     array<std::tuple<BatchInputMat*, BatchOutputMat*>> Batches;
 };
 
-// Here we also check for compatibility between layers
-auto get_layers_from_architecture()
-{
-    static_assert(ARCHITECTURE_COUNT > 1, "At least one input and one other layer is required");
-
-    array<base_layer_runtime*> layers;
-    static_for<0, ARCHITECTURE_COUNT>([&](auto it) {
-        using T = _ATE<it>;
-
-        if constexpr (it == 0) {
-            static_assert(T::TYPE == layer_type::INPUT, "First layer needs to be input");
-            append(layers, null); // We append a null pointer for the input layer because it doesn't do anything but fuck-up our indexing later.
-        }
-        if constexpr (it > 0) {
-            static_assert(T::TYPE != layer_type::INPUT, "Only one input layer is allowed");
-            append(layers, new DLR_T<it>);
-        }
-    });
-    return layers;
-}
-
 // This is used for an argument to _compile_model_ for a nice syntactic
 // sugar that makes it obvious which parameter we are setting.
 struct hyper_parameters {
@@ -189,17 +21,31 @@ struct hyper_parameters {
     loss_function Loss;
 };
 
-// This returns a new model each time.
+// This returns a new model each time:
+// - Allocates the runtime layers using the specified architecture.
+// - Initializes weights (currently there is no way to do custom weight-initialization @TODO!)
+// - Sets up the specified hyper-parameters.
 inline model compile_model(hyper_parameters h_params)
 {
     model result;
 
-    // Layer initialization
     auto layers = get_layers_from_architecture();
-    For(layers) if(it) it->initialize_weights();
     result.Layers = layers;
 
-    // Rest of hyper-parameters
+    // Weight initialization. For now we generate random numbers between -1 and 1.
+    // In the future we should definitely support different initializaton methods!
+    static_for<1, ARCHITECTURE_COUNT>([&](auto it) {
+        auto* l = (DLR_T<it>*)result.Layers[it];
+
+        For_as(stripe, l->Weights.Stripes)
+        {
+            // This is ugly.
+            // Also I'm not sure if rand() is statistically good enough.
+            For(stripe) it = ((f32)rand() / (32767 / 2)) - 1;
+        }
+    });
+
+    // Initialize the rest of hyper-parameters
     assert(h_params.Loss.Calculate != null && "Forgot loss function");
     result.Loss = h_params.Loss;
     result.LearningRate = h_params.LearningRate;
@@ -208,25 +54,36 @@ inline model compile_model(hyper_parameters h_params)
 }
 
 // _I_ is the starting layer index. Since input is at 0, this is normally 1.
+//
+// :DontCircumventTypechecking
+// We can't directly static_for this because the input of a layer is the output of the previous layer.
+// In order to not circumvent typecheking we use a recursive template function. When the code is actually
+// compiled this is unrolled (the result is every layer operating inlined directly one after the other),
+// so the compiler has extra opportunity for optimization.
 template <s64 I>
 auto feedforward(model m, const decltype(DLR_T<I - 1>::Out)& in)
 {
     auto* l = (DLR_T<I>*)m.Layers[I];
 
     l->Out.get_row_view<l->Out.R - 1>(1) = dot(l->Weights, in);
-    l->Out.row(0) = vecf<N_TRAIN_EXAMPLES_PER_STEP>(1.0f); // Augment the output to account for the bias term
 
-    DLR_T<I>::Activation::apply(l->Out);
+    DLR_T<I>::Activation::apply(l->Out); // This applies to the bias term as well but we set it to "1" the next line
+
+    l->Out.row(0) = vecf<N_TRAIN_EXAMPLES_PER_STEP>(1.0f); // Augment the output to account for the bias term
 
     if constexpr (I < ARCHITECTURE_COUNT - 1) {
         return feedforward<I + 1>(m, l->Out);
     } else {
-        return &l->Out; // We return the pointer to avoid copying
+        return l->Out.get_row_view<l->Out.R - 1>(1); // We return the output without the bias
     }
 }
 
 // We are going backwards, so _next_layer_delta_weighted_ is calculated before this layer's delta.
 // _I_ is the starting layer index. Since we are going backwards this is normally ARCHITECTURE_COUNT - 1.
+//
+// :DontCircumventTypechecking
+// We can't directly static_for this because we need the weighted delta of the next layer.
+// See note in feedforward(..).
 template <s64 I>
 void backpropagation(model m, const decltype(DLR_T<I + 1>::DeltaWeighted)& next_layer_delta_weighted)
 {
@@ -234,10 +91,10 @@ void backpropagation(model m, const decltype(DLR_T<I + 1>::DeltaWeighted)& next_
 
     // If this is the final layer _next_layer_delta_weighted_ points to the derivative
     // of the loss function, otherwise it points to next layer's _DeltaWeighted_.
-    
+
     decltype(l->Delta) out_no_bias = l->Out.get_row_view<l->Out.R - 1>(1);
     l->Delta = next_layer_delta_weighted * DLR_T<I>::Activation::get_derivative(out_no_bias);
-    
+
     auto delta_weighted = dot(T(l->Weights), l->Delta);
     l->DeltaWeighted = delta_weighted.get_row_view<delta_weighted.R - 1>(1);
 
@@ -248,6 +105,10 @@ void backpropagation(model m, const decltype(DLR_T<I + 1>::DeltaWeighted)& next_
 }
 
 // _I_ is the starting layer index. Since input is at 0, this is normally 1.
+//
+// :DontCircumventTypechecking
+// We can't directly static_for this because we need the input of the previous layer.
+// See note in feedforward(..).
 template <s64 I>
 void update_weights(model m, const decltype(DLR_T<I - 1>::Out)& in)
 {
@@ -261,11 +122,15 @@ void update_weights(model m, const decltype(DLR_T<I - 1>::Out)& in)
     }
 }
 
+// This is called by _fit()_.
+// Trains the model for a number of epochs given the already calculated batches.
 inline void train(model m, s64 epochs)
 {
     For_as(epoch, range(epochs))
     {
         fmt::print("Epoch {}/{}\n", epoch + 1, epochs);
+
+        decltype(T(BatchOutputMat {}))::StripeVecT totalCost;
 
         f32 eq_per_batch = 40.0f / m.Batches.Count;
         For_enumerate_as(batch_index, batch, m.Batches)
@@ -274,11 +139,11 @@ inline void train(model m, s64 epochs)
             fmt::print("[{:=<{}}>{:.<{}}]\r", "", (s64)(batch_index * eq_per_batch), "", (s64)max(eq_per_batch * m.Batches.Count - batch_index * eq_per_batch - 1, 0.0f));
 
             auto [attributes, targets] = batch;
-            auto* out = feedforward<1>(m, *attributes);
+
+            auto out = feedforward<1>(m, *attributes);
 
             // Calculate losses
-            BatchOutputMat losses;
-            For_enumerate(losses.Stripes) it = m.Loss.Calculate(targets->Stripes[it_index], out->Stripes[it_index + 1]);
+            BatchOutputMat losses = m.Loss.Calculate(*targets, out);
 
             // Calculate cost
             auto costMatrix = T(losses);
@@ -287,16 +152,16 @@ inline void train(model m, s64 epochs)
             For(range(1, costMatrix.R)) cost += costMatrix.Stripes[it];
             cost /= (f32)N_TRAIN_EXAMPLES_PER_STEP;
 
+            totalCost += cost;
+
             // Calculate cost derivative
-            BatchOutputMat d;
-            For_enumerate(d.Stripes) it = m.Loss.GetDerivative(targets->Stripes[it_index], out->Stripes[it_index + 1]);
+            BatchOutputMat d = m.Loss.GetDerivative(*targets, out);
 
             backpropagation<ARCHITECTURE_COUNT - 1>(m, d);
             update_weights<1>(m, *attributes);
         }
-
         fmt::print("{0}/{0} ", m.Batches.Count * N_TRAIN_EXAMPLES_PER_STEP);
-        fmt::print("[{:=<{}}]\n", "", 40);
+        fmt::print("[{:=<{}}] cost: {}\n", "", 40, totalCost);
     }
     fmt::print("\n");
 }
@@ -307,6 +172,9 @@ struct fit_model_parameters {
     s64 Epochs = 0;
 };
 
+// Takes X and y and splits them into batches.
+// Each batch has _N_TRAIN_EXAMPLES_PER_STEP_ elements (see note in this function's body).
+// Also calls _train()_ with the specified number of epochs.
 inline void fit(model m, fit_model_parameters params)
 {
     assert(params.X.R == params.y.R && "Different number of examples in X and y");
@@ -399,6 +267,15 @@ inline void fit(model m, fit_model_parameters params)
     train(m, params.Epochs);
 }
 
+// Takes X examples of whatever length and uses the trained model weights to get an output.
+// This function currently has a very ugly implementation since we need to deal with dynamic matrices.
+// We don't yet have a robust type that can handle e.g. reshaping on the fly (the _fit()_ portion of
+// this library works with compile-time parameters).
+//
+// Note: In the future I might just give up on this since this library is meant to work side by side
+// with Python (that's why I have just hacked this thing and haven't given it enough attention yet).
+// We can just give the weights to numpy and deploy the model that way. This library's sole purpose
+// is just to speed up the training process of the model.
 inline array<vecf<OUTPUT_NEURONS>> predict(model m, array_view<f32> X)
 {
     assert(X.Count % INPUT_SHAPE == 0 && "Bad X shape");
@@ -414,14 +291,8 @@ inline array<vecf<OUTPUT_NEURONS>> predict(model m, array_view<f32> X)
     free(Xt.Data);
 
     static_for<1, ARCHITECTURE_COUNT>([&](auto i) {
-        using _T = std::tuple_element_t<i, ARCHITECTURE_T>;
-        using _TM1 = std::tuple_element_t<i - 1, ARCHITECTURE_T>;
-
-        using L_T = dense_layer_runtime<_TM1::NUM_NEURONS, _T::NUM_NEURONS, _T::Activation>;
-
-        auto l = (L_T*)m.Layers[i]; // -1 for the first layer (which is the input layer)
-
-        matf<_T::NUM_NEURONS, _TM1::NUM_NEURONS + 1, true> packed_weights = l->Weights;
+        auto l = (DLR_T<i>*)m.Layers[i];
+        matf<DLR_T<i>::NUM_NEURONS, DLR_T<i>::NUM_INPUTS + 1, true> packed_weights = l->Weights;
 
         dyn_mat weights;
         append_pointer_and_size(weights.Data, &packed_weights.Stripes[0][0], packed_weights.R * packed_weights.C);
@@ -431,7 +302,8 @@ inline array<vecf<OUTPUT_NEURONS>> predict(model m, array_view<f32> X)
         auto new_o = dot(weights, o);
         free(o.Data);
 
-        For(new_o.Data) it = _T::Activation::apply(it); // @Performance
+        // This fails for softmax.
+        For(new_o.Data) it = DLR_T<i>::Activation::apply(it); // @Performance
 
         if constexpr (i != ARCHITECTURE_COUNT - 1) {
             auto tout = T(new_o);

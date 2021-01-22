@@ -366,6 +366,69 @@ T norm(const mat<T, R, C, Packed>& m) {
 	return (T)sqrt(norm_sq(m));
 }
 
+// Returns the element-wise minimum of arguments
+template <any_mat Mat>
+always_inline Mat element_wise_min(const Mat& lhs, const Mat& rhs)
+{
+    Mat result = lhs;
+    For(result.Stripes) it = element_wise_min(it);
+    return result;
+}
+
+// Returns the element-wise maximum of arguments
+template <any_mat Mat>
+always_inline Mat element_wise_max(const Mat& lhs, const Mat& rhs)
+{
+    Mat result = lhs;
+    For(result.Stripes) it = element_wise_max(it);
+    return result;
+}
+
+// Clamps each vector value with specified bounds
+template <any_mat Mat>
+always_inline Mat element_wise_clamp(const Mat& arg, typename vec_info<Mat>::T lower, typename vec_info<Mat>::T upper)
+{
+    Mat result = arg;
+    For(result.Stripes) it = element_wise_clamp(it);
+    return result;
+}
+
+// Returns the element-wise log of the matrix
+template <any_mat Mat>
+always_inline Mat element_wise_log(const Mat& mat)
+{
+    Mat result = mat;
+    For(result.Stripes) it = element_wise_log(it);
+    return result;
+}
+
+// Returns the element-wise exp of the matrix
+template <any_mat Mat>
+always_inline Mat element_wise_exp(const Mat& mat)
+{
+    Mat result = mat;
+    For(result.Stripes) it = element_wise_exp(it);
+    return result;
+}
+
+// Returns the element-wise abs of the matrix
+template <any_mat Mat>
+always_inline Mat element_wise_abs(const Mat& mat)
+{
+    Mat result = mat;
+    For(result.Stripes) it = element_wise_abs(it);
+    return result;
+}
+
+// Returns the sum of the elements in the matrix
+template <any_mat Mat>
+always_inline auto sum(const Mat& mat)
+{
+    auto result = sum(mat.Stripes[0]);
+	For(range(1, mat.Stripes.Count)) result += sum(mat.Stripes[it]);
+    return result;
+}
+
 template <typename T1, typename T2, s64 R, s64 C, bool Packed1, bool Packed2>
 bool almost_equal(const mat<T1, R, C, Packed1>& lhs, const mat<T2, R, C, Packed2>& rhs) {
 	bool eq = true;

@@ -39,10 +39,10 @@ s32 main()
 
     Context.AllocAlignment = 16; // For SIMD
 
-    srand((u32)time(NULL));
+    // srand((u32)time(NULL));
 
     // Deterministic initialization
-    // srand(42);
+    srand(42);
 
     //
     // We attempt to train an XOR gate:
@@ -66,7 +66,7 @@ s32 main()
     model m;
     WITH_ALLOC(Context.Temp)
     {
-        m = compile_model({ .LearningRate = 5.0f, .Loss = BinaryCrossEntropy });
+        m = compile_model({ .LearningRate = 1.0f, .Loss = BinaryCrossEntropy });
         fit(m, { .X = X, .y = y, .Epochs = 500 });
     }
 

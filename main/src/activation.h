@@ -1,6 +1,6 @@
 #pragma once
 
-// Note: We provide so much overloads because we will vectorize in the future!
+// We provide so much overloads ... is this needed?
 
 struct activation_none {
     // Applies the activation function to a single value.
@@ -19,7 +19,7 @@ struct activation_none {
     // Gets the derivative of the activation function given the neuron outputs _a_.
     // These should not include the bias term.
     //
-    // Derivative of identify function is 1
+    // Derivative of the identify function is 1.
     template <s64 R, s64 C>
     static matf<R, C> get_derivative(const matf<R, C>& a) { return matf<R, C>(1.0f); }
 };
@@ -70,7 +70,13 @@ struct activation_softmax {
     }
 
     template <s64 R, s64 C>
-    static void apply(matf<R, C>& m) { For(m.Stripes) apply(it); }
+    static void apply(matf<R, C>& m)
+    {
+        // @Performance My eyes...
+        auto t = T(m);
+        For(t.Stripes) apply(it);
+        m = T(t);
+    }
 
     // Derivative of sigmoid is s(x)(1 - s(x))
     template <s64 R, s64 C>
