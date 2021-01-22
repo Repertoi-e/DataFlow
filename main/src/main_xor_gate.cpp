@@ -7,7 +7,8 @@ constexpr s64 N_TRAIN_EXAMPLES_PER_STEP = 1;
 // XOR function is not linearly separable so we need atleast 1 hidden layer!
 constexpr auto ARCHITECTURE = std::make_tuple(
     input<2> {},
-    dense<2, activation_relu> {},
+    dense<10, activation_sigmoid> {},
+    dense<5, activation_sigmoid> {},
     dense<1, activation_sigmoid> {});
 
 // Include this after architecture has been defined.
@@ -52,14 +53,14 @@ s32 main()
         append_pointer_and_size(X.Data, input.Data, input.Count);
         X.R = input.Count / INPUT_SHAPE;
         X.C = INPUT_SHAPE;
-        
+
         dyn_mat y;
         append_pointer_and_size(y.Data, targets.Data, targets.Count);
         y.R = targets.Count / OUTPUT_NEURONS;
         y.C = OUTPUT_NEURONS;
 
-        model m = compile_model({ .LearningRate = 5.0f, .B1 = 0.9f, .B2 = 0.999f, .Loss = BinaryCrossEntropy });
-        fit(m, { .X = X, .y = y, .Epochs = 5000 });
+        model m = compile_model({ .LearningRate = 0.01f, .B1 = 0.9f, .B2 = 0.999f, .Loss = BinaryCrossEntropy });
+        fit(m, { .X = X, .y = y, .Epochs = 2000 });
 
         // Here we generate random validation data
         const s64 VAL_SAMPLES = 50;

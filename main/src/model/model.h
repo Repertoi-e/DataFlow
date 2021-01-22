@@ -139,14 +139,13 @@ void update_weights(model m, s64 t, const decltype(DLR_T<I - 1>::Out)& in)
     l->SecondRawMoment = m.B2 * l->SecondRawMoment + (1 - m.B2) * (average_weight_update * average_weight_update);
 
     // We do this bias correction because the first time-steps don't have a moment
-    auto first_moment_bias_corrected = l->FirstRawMoment / (1 - pow(m.B1, t));
-    auto second_moment_bias_corrected = l->SecondRawMoment / (1 - pow(m.B2, t));
+    auto first_moment_bias_corrected = l->FirstRawMoment / (1.0f - pow(m.B1, t));
+    auto second_moment_bias_corrected = l->SecondRawMoment / (1.0f - pow(m.B2, t));
 
     // +1e-07F to avoid division by zero
     auto coeff = m.LearningRate * first_moment_bias_corrected / (sqrt(second_moment_bias_corrected) + 1e-07F);
 
-    // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-    l->Weights -= m.LearningRate * average_weight_update;
+    l->Weights -= coeff * average_weight_update;
 
     if constexpr (I < ARCHITECTURE_COUNT - 1) {
         update_weights<I + 1>(m, t, l->Out);
