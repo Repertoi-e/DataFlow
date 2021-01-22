@@ -6,7 +6,7 @@
 // We define this
 //
 
-constexpr s64 N_TRAIN_EXAMPLES_PER_STEP = 1000;
+constexpr s64 N_TRAIN_EXAMPLES_PER_STEP = 100;
 
 constexpr auto ARCHITECTURE = std::make_tuple(
     input<28 * 28> {},

@@ -119,7 +119,16 @@ bool parse_fill_and_align(parse_context *p, type argType, format_specs *specs) {
         align = get_alignment_from_char(rest[0]);
         ++rest.Data, --rest.Count;  // Skip the align, later we advance _It_ to _rest_
     } else {
-        fill = ' ';  // If we parsed an alignment but no fill then the fill must be ' ' by default
+        auto [maybeAlign, maybeStatus, maybeRest] = eat_code_point(rest);
+        auto maybeNextAlign = get_alignment_from_char((utf8)maybeAlign);
+        if (maybeStatus == PARSE_SUCCESS && maybeNextAlign != alignment::NONE) {
+            // We parsed something like "=<" which we interpret as = being the fill character 
+            // and < meaning pad left, even though = normally means numeric aligment.
+            align = maybeNextAlign; 
+            rest = maybeRest;
+        } else {
+            fill = ' '; // If we parsed an alignment but no fill then the fill must be ' ' by default
+        }
     }
 
     // If we got here and didn't get an alignment specifier we roll back and don't parse anything.

@@ -10,6 +10,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\pch.cpp" />
-    <ClCompile Include="src\main_or_gate.cpp" />
+    <ClCompile Include="src\main_mnist.cpp" />
   </ItemGroup>
 </Project>

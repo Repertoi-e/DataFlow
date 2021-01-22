@@ -14,28 +14,28 @@ struct activation_none {
     // Applies the activation function (in place) to a matrix of arbitrary dimension.
     // This is usually the _Out_ matrix with _R_ neurons and _C_ training samples.
     template <s64 R, s64 C>
-    static void apply(mat_view<f32, R, C>& m) { return; }
+    static void apply(matf<R, C>& m) { return; }
 
     // Gets the derivative of the activation function given the neuron outputs _a_.
     // These should not include the bias term.
     //
     // Derivative of identify function is 1
     template <s64 R, s64 C>
-    static matf<R, C> get_derivative(const mat_view<f32, R, C>& a) { return matf<R, C>(1.0f); }
+    static matf<R, C> get_derivative(const matf<R, C>& a) { return matf<R, C>(1.0f); }
 };
 
 struct activation_sigmoid {
     static f32 apply(f32 x) { return 1.0f / (1.0f + expf(-x)); }
 
     template <s64 Dim>
-    static void apply(vecf<Dim>& v) { return 1.0f / (1.0f + element_wise_exp(v)); }
+    static void apply(vecf<Dim>& v) { For(v) it = apply(it); }
 
     template <s64 R, s64 C>
-    static void apply(mat_view<f32, R, C>& m) { For(m.Stripes) apply(it); }
+    static void apply(matf<R, C>& m) { For(m.Stripes) apply(it); }
 
     // Derivative of sigmoid is s(x)(1 - s(x))
     template <s64 R, s64 C>
-    static matf<R, C> get_derivative(const mat_view<f32, R, C>& a) { return (a * (matf<R, C>(1.0f) - a)); }
+    static matf<R, C> get_derivative(const matf<R, C>& a) { return (a * (matf<R, C>(1.0f) - a)); }
 };
 
 // @Performance We can optimize this by looking at the sign bit
@@ -46,11 +46,11 @@ struct activation_relu {
     static void apply(vecf<Dim>& v) { For(v) it = max(0, it); }
 
     template <s64 R, s64 C>
-    static void apply(mat_view<f32, R, C>& m) { For(m.Stripes) apply(it); }
+    static void apply(matf<R, C>& m) { For(m.Stripes) apply(it); }
 
     // Derivative of sigmoid is s(x)(1 - s(x))
     template <s64 R, s64 C>
-    static matf<R, C> get_derivative(const mat_view<f32, R, C>& a)
+    static matf<R, C> get_derivative(const matf<R, C>& a)
     {
         matf<R, C> result = a;
         For(result.Stripes) it = max(0, it) / it;
@@ -65,16 +65,17 @@ struct activation_softmax {
     static void apply(vecf<Dim>& v)
     {
         // We -max(v) to be more numerically stable
-        auto e = element_wise_exp(v - element_wise_max(v));
-        return e / sum(e);
+        auto e = element_wise_exp(v - max(v));
+        v = e / sum(e);
     }
 
     template <s64 R, s64 C>
-    static void apply(mat_view<f32, R, C>& m) { For(m.Stripes) apply(it); }
+    static void apply(matf<R, C>& m) { For(m.Stripes) apply(it); }
 
     // Derivative of sigmoid is s(x)(1 - s(x))
     template <s64 R, s64 C>
-    static matf<R, C> get_derivative(const mat_view<f32, R, C>& a)
+    static matf<R, C> get_derivative(const matf<R, C>& a)
     {
+        return a;
     }
 };

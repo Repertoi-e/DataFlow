@@ -23,26 +23,11 @@ using BatchOutputMat = matf<OUTPUT_NEURONS, N_TRAIN_EXAMPLES_PER_STEP>;
 struct base_layer_runtime {
     virtual void initialize_weights() {};
 
-    virtual void feedforward(void* input, s64 input_dim) {};
+    virtual void feedforward(void* input) {};
 
     virtual void calculate_delta(void* next_layer_delta_weighted) {};
 
     virtual void update_weights(f32 learning_rate) {};
-
-    virtual array<f32> get_packed_weights() { return {}; };
-
-    struct information {
-        s64 NumInputs;
-        s64 NumNeurons;
-
-        f32* Out;
-        f32* DeltaWeighted;
-    };
-
-    // This just returns some important pointers to the cached calculations of a layer
-    // and some info about the layer architeture since that is actually templated
-    // and we lose that information when we cast to base_layer_runtime*.
-    virtual information get_information() = 0;
 };
 
 //
@@ -130,18 +115,15 @@ struct dense_layer_runtime : base_layer_runtime {
     // It is calculated by just dot(T(Weights), Delta).
     matf<NumInputs, N_TRAIN_EXAMPLES_PER_STEP> DeltaWeighted;
 
-    void feedforward(void* input, s64 input_dim) override
+    void feedforward(void* input) override
     {
-        assert(input_dim == NumInputs + 1); // Sanity
-
         auto* input_as_matrix = (matf<NumInputs + 1, N_TRAIN_EXAMPLES_PER_STEP>*)input;
         In = input_as_matrix; // Used later when calculating the weight update.
 
         Out.get_view<NumNeurons, N_TRAIN_EXAMPLES_PER_STEP>(1, 0) = dot(Weights, *In);
         Out.row(0) = vecf<N_TRAIN_EXAMPLES_PER_STEP>(1.0f); // Augment the output to account for the bias term
 
-        // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-        // Activation->apply_to_matrix(Out);
+        Activation::apply(Out);
     }
 
     // We are going backwards, so _next_layer_delta_weighted_ is calculated before this layer's delta.
@@ -150,8 +132,10 @@ struct dense_layer_runtime : base_layer_runtime {
         // If this is the final layer _nextLayerDelta_ points to the derivative of the loss function,
         // otherwise it points to next layer's _DeltaWeighted_.
         auto* d = (matf<NumNeurons, N_TRAIN_EXAMPLES_PER_STEP>*)next_layer_delta_weighted;
-        // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-        // Delta = *d * Activation->get_derivative(Out);
+
+        decltype(Delta) outd = Out.get_view<NumNeurons, N_TRAIN_EXAMPLES_PER_STEP>(1, 0);
+
+        Delta = *d * Activation::get_derivative(outd);
         DeltaWeighted = dot(T(Weights), Delta).get_view<NumInputs, N_TRAIN_EXAMPLES_PER_STEP>(1, 0);
     }
 
@@ -159,38 +143,6 @@ struct dense_layer_runtime : base_layer_runtime {
     {
         auto average_kernel_update = dot(Delta, T(*In)) / (f32)N_TRAIN_EXAMPLES_PER_STEP;
         Weights -= learning_rate * average_kernel_update;
-    }
-
-    // Returns the trained weights but packed together (they might not be
-    // because matrices may add padding to improve performance). Allocates an array.
-    array<f32> get_packed_weights() override
-    {
-        matf<NumNeurons, NumInputs + 1, true> packed_weights = Weights;
-
-        s64 num_floats = NumNeurons * (NumInputs + 1);
-
-        array<f32> result;
-        reserve(result, num_floats);
-
-        copy_memory(result.Data, &packed_weights.Stripes[0][0], num_floats * sizeof(f32));
-        result.Count = num_floats;
-
-        return result;
-    }
-
-    information get_information() override
-    {
-        information result;
-        result.NumInputs = NumInputs;
-        result.NumNeurons = NumNeurons;
-
-        result.Out = &Out.Stripes[0][0];
-        result.DeltaWeighted = &DeltaWeighted.Stripes[0][0];
-
-        // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-        // result.Activation = Activation;
-
-        return result;
     }
 };
 
@@ -202,9 +154,6 @@ struct model {
     loss_function Loss;
 
     array<std::tuple<BatchInputMat*, BatchOutputMat*>> Batches;
-
-    array<dyn_mat> PackedWeights;
-    bool DirtyPackedWeights = true;
 };
 
 // Here we also check for compatibility between layers
@@ -257,66 +206,70 @@ inline model compile_model(hyper_parameters h_params)
 
 inline void train(model m, s64 epochs)
 {
-    /*
-    m.DirtyPackedWeights = true;
-
     For_as(epoch, range(epochs))
     {
-        void* input = m.Input;
-        s64 input_dim = INPUT_SHAPE + 1; // +1 for the bias term
+        fmt::print("Epoch {}/{}\n", epoch + 1, epochs);
 
-        For_enumerate_as(layer_index, layer, m.Layers)
+        f32 eq_per_batch = 40.0f / m.Batches.Count;
+        For_enumerate_as(batch_index, batch, m.Batches)
         {
-            // The last layer doesn't do activation.
-            layer->feedforward(input, input_dim);
+            fmt::print("{}/{} ", batch_index * N_TRAIN_EXAMPLES_PER_STEP, m.Batches.Count * N_TRAIN_EXAMPLES_PER_STEP);
+            fmt::print("[{:=<{}}>{:.<{}}]\r", "", (s64) (batch_index * eq_per_batch), "", (s64) max(eq_per_batch * m.Batches.Count - batch_index * eq_per_batch - 1, 0.0f));
 
-            auto info = layer->get_information(); // Cache this?
-            input = info.Out;
-            input_dim = info.NumNeurons + 1; // +1 for the bias term
+            auto [attributes, targets] = batch;
+
+            void* o = attributes; // Holds the last output of the layers
+
+            static_for<1, ARCHITECTURE_COUNT>([&](auto i) {
+                using T = std::tuple_element_t<i, ARCHITECTURE_T>;
+                using TM1 = std::tuple_element_t<i - 1, ARCHITECTURE_T>;
+
+                using L_T = dense_layer_runtime<TM1::NUM_NEURONS, T::NUM_NEURONS, T::Activation>;
+                auto l = (L_T*)m.Layers[i - 1]; // -1 for the first layer (which is the input layer)
+                l->feedforward(o);
+                o = &l->Out;
+            });
+
+            // Get the last layer
+            using _T = std::tuple_element_t<ARCHITECTURE_COUNT - 1, ARCHITECTURE_T>;
+            using _TM1 = std::tuple_element_t<ARCHITECTURE_COUNT - 2, ARCHITECTURE_T>;
+
+            using O_T = dense_layer_runtime<_TM1::NUM_NEURONS, _T::NUM_NEURONS, _T::Activation>;
+            auto* ol = (O_T*)m.Layers[-1];
+
+            BatchOutputMat losses;
+            For_enumerate(losses.Stripes) it = m.Loss.Calculate(targets->Stripes[it_index], ol->Out.Stripes[it_index + 1]);
+
+            auto costMatrix = T(losses);
+
+            auto cost = costMatrix.Stripes[0];
+            For(range(1, costMatrix.R)) cost += costMatrix.Stripes[it];
+            cost /= (f32)N_TRAIN_EXAMPLES_PER_STEP;
+
+            // cost derivative
+            BatchOutputMat d;
+            For_enumerate(d.Stripes) it = m.Loss.GetDerivative(targets->Stripes[it_index], ol->Out.Stripes[it_index + 1]);
+
+            void* delta = &d;
+
+            static_for<1, ARCHITECTURE_COUNT>([&](auto i) {
+                using T = std::tuple_element_t<ARCHITECTURE_COUNT - i, ARCHITECTURE_T>;
+                using TM1 = std::tuple_element_t<ARCHITECTURE_COUNT - i - 1, ARCHITECTURE_T>;
+
+                using L_T = dense_layer_runtime<TM1::NUM_NEURONS, T::NUM_NEURONS, T::Activation>;
+                auto l = (L_T*)m.Layers[-i]; // Negative indexing means from the back
+                l->calculate_delta(delta);
+                delta = &l->DeltaWeighted;
+            });
+
+            // Finally, do the weight updates
+            For(m.Layers) it->update_weights(m.LearningRate);
         }
 
-        auto out_layer = m.Layers[-1];
-        auto out_info = out_layer->get_information();
-
-        assert(out_info.NumNeurons == OUTPUT_NEURONS); // Sanity
-
-        auto* out_as_matrix = (matf<OUTPUT_NEURONS + 1, N_TRAIN_EXAMPLES_PER_STEP>*)out_info.Out;
-        // auto predicted = out_as_matrix->get_view<OUTPUT_NEURONS, N_TRAIN_EXAMPLES_PER_STEP>(1, 0);
-
-        BatchOutputMat losses;
-        For_enumerate(losses.Stripes) it = m.Loss.Calculate(m.Targets->Stripes[it_index], out_as_matrix->Stripes[it_index + 1]);
-
-        auto costMatrix = T(losses);
-
-        auto cost = costMatrix.Stripes[0];
-        For(range(1, costMatrix.R)) cost += costMatrix.Stripes[it];
-        cost /= (f32)N_TRAIN_EXAMPLES_PER_STEP;
-
-        if (epoch == 700) {
-            int a = 42;
-        }
-
-        fmt::print("Cost: {}\n", cost);
-
-        // cost derivative
-        BatchOutputMat d;
-        For_enumerate(d.Stripes) it = m.Loss.GetDerivative(m.Targets->Stripes[it_index], out_as_matrix->Stripes[it_index + 1]);
-
-        void* delta = &d;
-
-        // Calculate delta for all layers going backwards
-        For(range(m.Layers.Count - 1, -1, -1))
-        {
-            auto l = m.Layers[it];
-
-            l->calculate_delta(delta);
-            delta = l->get_information().DeltaWeighted;
-        }
-
-        // Finally, do the weight updates
-        For(m.Layers) it->update_weights(m.LearningRate);
+        fmt::print("{0}/{0} ", m.Batches.Count * N_TRAIN_EXAMPLES_PER_STEP);
+        fmt::print("[{:=<{}}]\n", "", eq_per_batch * m.Batches.Count);
     }
-    */
+    fmt::print("\n");
 }
 
 // We do this for syntactic sugar..
@@ -374,7 +327,7 @@ inline void fit(model m, fit_model_parameters params)
         // @TODO: Can we actually calculate that cache thing with code? Would be a good feature of this library.
         //
         // We first allocate the transposed types because they have the examples in the rows
-        // (like we expect them from the user). We later transpose them so they are the in 
+        // (like we expect them from the user). We later transpose them so they are the in
         // the shape the layers expect them to be in.
         auto batch_in_transposed = new decltype(T(BatchInputMat {}));
         auto batch_out_transposed = new decltype(T(BatchOutputMat {}));
@@ -405,8 +358,12 @@ inline void fit(model m, fit_model_parameters params)
         }
         assert(p == batch_end_y); // Sanity
 
-        auto* bin = new BatchInputMat(T(*batch_in_transposed));
-        auto* bout = new BatchOutputMat(T(*batch_out_transposed));
+        auto* bin = new BatchInputMat;
+        *bin = T(*batch_in_transposed);
+
+        auto* bout = new BatchOutputMat;
+        *bout = T(*batch_out_transposed);
+
         append(m.Batches, std::make_tuple(bin, bout));
     }
 
@@ -417,18 +374,6 @@ inline array<vecf<OUTPUT_NEURONS>> predict(model m, array_view<f32> X)
 {
     assert(X.Count % INPUT_SHAPE == 0 && "Bad X shape");
 
-    if (m.DirtyPackedWeights) {
-        For(m.PackedWeights) free(it.Data);
-        free(m.PackedWeights);
-
-        For(m.Layers)
-        {
-            auto packed_weights = it->get_packed_weights();
-            auto info = it->get_information();
-            append(m.PackedWeights, dyn_mat { info.NumNeurons, info.NumInputs + 1, packed_weights });
-        }
-    }
-
     dyn_mat Xdyn;
     append_array(Xdyn.Data, X);
     Xdyn.R = X.Count / INPUT_SHAPE;
@@ -436,48 +381,52 @@ inline array<vecf<OUTPUT_NEURONS>> predict(model m, array_view<f32> X)
 
     dyn_mat Xt = augment_dyn_mat(Xdyn);
 
-    auto Xaugmented = T(Xt);
+    auto o = T(Xt); // Holds the last output of the layers
     free(Xt.Data);
 
-    auto input = Xaugmented;
+    static_for<1, ARCHITECTURE_COUNT>([&](auto i) {
+        using _T = std::tuple_element_t<i, ARCHITECTURE_T>;
+        using _TM1 = std::tuple_element_t<i - 1, ARCHITECTURE_T>;
 
-    For_enumerate_as(layer_index, layer, m.Layers)
-    {
-        auto weights = m.PackedWeights[layer_index];
+        using L_T = dense_layer_runtime<_TM1::NUM_NEURONS, _T::NUM_NEURONS, _T::Activation>;
 
-        auto out = dot(weights, input);
+        auto l = (L_T*)m.Layers[i - 1]; // -1 for the first layer (which is the input layer)
 
-        auto info = layer->get_information();
-        // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-        // For(out.Data) it = info.Activation->apply_single(it);
+        matf<_T::NUM_NEURONS, _TM1::NUM_NEURONS + 1, true> packed_weights = l->Weights;
 
-        if (layer_index != m.Layers.Count - 1) {
-            auto tout = T(out);
+        dyn_mat weights;
+        append_pointer_and_size(weights.Data, &packed_weights.Stripes[0][0], packed_weights.R * packed_weights.C);
+        weights.R = packed_weights.R;
+        weights.C = packed_weights.C;
+
+        auto new_o = dot(weights, o);
+        free(o.Data);
+
+        For(new_o.Data) it = _T::Activation::apply(it); // @Performance
+
+        if constexpr (i != ARCHITECTURE_COUNT - 1) {
+            auto tout = T(new_o);
             auto augmented_tout = augment_dyn_mat(tout);
 
-            input = T(augmented_tout);
+            o = T(augmented_tout);
 
-            free(out.Data);
             free(tout.Data);
             free(augmented_tout.Data);
         } else {
-            input = out;
+            o = T(new_o);
         }
-    }
-
-    auto output = input;
-
-    auto tout = T(output);
-    free(output.Data);
+        free(new_o.Data);
+        free(weights.Data);
+    });
 
     array<vecf<OUTPUT_NEURONS>> y;
     reserve(y, X.Count);
 
-    For(range(tout.R))
+    For(range(o.R))
     {
-        vecf<OUTPUT_NEURONS> o;
-        copy_memory(&o, &tout.Data[it * tout.C], OUTPUT_NEURONS * sizeof(f32));
-        append(y, o);
+        vecf<OUTPUT_NEURONS> t;
+        copy_memory(&t, &o.Data[it * o.C], OUTPUT_NEURONS * sizeof(f32));
+        append(y, t);
     }
     return y;
 }

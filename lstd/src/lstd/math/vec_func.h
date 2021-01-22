@@ -225,6 +225,24 @@ always_inline auto sum(const Vec& vec)
     return result;
 }
 
+// Returns the max of the elements in the vector
+template <any_vec Vec>
+always_inline auto max(const Vec& vec)
+{
+    auto result = vec[0];
+    For(range(1, Vec::DIM)) if (vec[it] > result) result = vec[it];
+    return result;
+}
+
+// Returns the min of the elements in the vector
+template <any_vec Vec>
+always_inline auto min(const Vec& vec)
+{
+    auto result = vec[0];
+    For(range(1, Vec::DIM)) if (vec[it] < result) result = vec[it];
+    return result; 
+}
+
 // We need this for the generalized cross product
 #include "mat_func.h"
 
