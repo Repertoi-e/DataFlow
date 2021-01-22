@@ -166,7 +166,7 @@ requires(vec_info<Vec>::DIM == 3) Vec cross(const stack_array<const Vec*, 2>& ar
 
 // Returns the element-wise minimum of arguments
 template <any_vec Vec>
-always_inline Vec element_wise_min(const Vec& lhs, const Vec& rhs)
+always_inline Vec min(const Vec& lhs, const Vec& rhs)
 {
     Vec result;
     For(range(Vec::DIM)) result[it] = min(lhs[it], rhs[it]);
@@ -175,7 +175,7 @@ always_inline Vec element_wise_min(const Vec& lhs, const Vec& rhs)
 
 // Returns the element-wise maximum of arguments
 template <any_vec Vec>
-always_inline Vec element_wise_max(const Vec& lhs, const Vec& rhs)
+always_inline Vec max(const Vec& lhs, const Vec& rhs)
 {
     Vec result;
     For(range(Vec::DIM)) result[it] = max(lhs[it], rhs[it]);
@@ -184,7 +184,7 @@ always_inline Vec element_wise_max(const Vec& lhs, const Vec& rhs)
 
 // Clamps each vector value with specified bounds
 template <any_vec Vec>
-always_inline Vec element_wise_clamp(const Vec& arg, typename vec_info<Vec>::T lower, typename vec_info<Vec>::T upper)
+always_inline Vec clamp(const Vec& arg, typename vec_info<Vec>::T lower, typename vec_info<Vec>::T upper)
 {
     Vec result;
     For(range(Vec::DIM)) result[it] = clamp(arg[it], lower, upper);
@@ -193,7 +193,7 @@ always_inline Vec element_wise_clamp(const Vec& arg, typename vec_info<Vec>::T l
 
 // Returns the element-wise log of the vector
 template <any_vec Vec>
-always_inline Vec element_wise_log(const Vec& vec)
+always_inline Vec log(const Vec& vec)
 {
     Vec result;
     For(range(Vec::DIM)) result[it] = log(vec[it]);
@@ -202,16 +202,25 @@ always_inline Vec element_wise_log(const Vec& vec)
 
 // Returns the element-wise exp of the vector
 template <any_vec Vec>
-always_inline Vec element_wise_exp(const Vec& vec)
+always_inline Vec exp(const Vec& vec)
 {
     Vec result;
     For(range(Vec::DIM)) result[it] = exp(vec[it]);
     return result;
 }
 
+// Returns the element-wise sqrt of the vector
+template <any_vec Vec>
+always_inline Vec sqrt(const Vec& vec)
+{
+    Vec result;
+    For(range(Vec::DIM)) result[it] = sqrt(vec[it]);
+    return result;
+}
+
 // Returns the element-wise abs of the vector
 template <any_vec Vec>
-always_inline Vec element_wise_abs(const Vec& vec)
+always_inline Vec abs(const Vec& vec)
 {
     Vec result;
     For(range(Vec::DIM)) result[it] = abs(vec[it]);

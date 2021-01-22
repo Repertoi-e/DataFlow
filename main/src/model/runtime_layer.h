@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../pch.h"
+
 #include "activation.h"
 
 struct base_layer_runtime {
@@ -83,6 +85,10 @@ struct dense_layer_runtime : base_layer_runtime {
     //
     // It is calculated by just dot(T(Weights), Delta).
     matf<NUM_INPUTS, N_TRAIN_EXAMPLES_PER_STEP> DeltaWeighted;
+
+    // Used by Adam optimizer:
+    matf<NUM_NEURONS, NUM_INPUTS + 1> FirstRawMoment;
+    matf<NUM_NEURONS, NUM_INPUTS + 1> SecondRawMoment;
 };
 
 template <s64 I>

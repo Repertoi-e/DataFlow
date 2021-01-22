@@ -1,6 +1,6 @@
 #pragma once
 
-#include "pch.h"
+#include "../pch.h"
 
 using BatchInputMat = matf<INPUT_SHAPE + 1, N_TRAIN_EXAMPLES_PER_STEP>;
 using BatchOutputMat = matf<OUTPUT_NEURONS, N_TRAIN_EXAMPLES_PER_STEP>;
@@ -19,26 +19,20 @@ struct loss_function {
 };
 
 // _y_ is the target.
-// _z_ is an output of a set of neurons (should be from 0 to 1).
-//
-// We avoid calculating log(0) by adding a small epsilon. 
-// This means that the loss will be slighly higher than it can be in reality.
+// _z_ is an output of a set of neurons (should be between 0 and 1).
 inline auto binary_cross_entropy(const BatchOutputMat& y, const BatchOutputMat& z)
 {
-    auto eps_mat = BatchOutputMat(1e-07F);
-    auto ones_mat = BatchOutputMat(1.0f);
-
-    // @Performance @Math
-    return -y * element_wise_log(eps_mat + z) - (ones_mat - y) * element_wise_log(ones_mat - z + eps_mat);
+    // We avoid calculating log(0) by adding a small epsilon.
+    // This means that the loss will be slighly higher than it can be in reality.
+    return -y * log(1e-07F + z) - (1.0f - y) * log(1.0f - z + 1e-07F); // @Performance @Math
 }
 
+// _y_ is the target.
+// _z_ is an output of a set of neurons (should be between 0 and 1).
 inline auto binary_cross_entropy_derivative(const BatchOutputMat& y, const BatchOutputMat& z)
 {
-    auto eps_mat = BatchOutputMat(1e-07F);
-    auto ones_mat = BatchOutputMat(1.0f);
-
     // Avoid division by zero by adding a small epsilon
-    return -y / (z + eps_mat) + (ones_mat - y) / (ones_mat - z + eps_mat);
+    return -y / (z + 1e-07F) + (1.0f - y) / (1.0f - z + 1e-07F);
 }
 
 // Used when there is a single output neuron and two classes (0 and 1).

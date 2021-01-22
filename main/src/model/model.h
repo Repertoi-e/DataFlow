@@ -1,5 +1,14 @@
 #pragma once
 
+#include "../pch.h"
+
+// Infer these from the architecture which should be defined before including this file...
+using ARCHITECTURE_T = decltype(ARCHITECTURE);
+constexpr s64 ARCHITECTURE_COUNT = std::tuple_size_v<ARCHITECTURE_T>;
+
+constexpr s64 INPUT_SHAPE = std::tuple_element_t<0, ARCHITECTURE_T>::NUM_NEURONS;
+constexpr s64 OUTPUT_NEURONS = std::tuple_element_t<ARCHITECTURE_COUNT - 1, ARCHITECTURE_T>::NUM_NEURONS;
+
 #include "dyn_mat.h"
 #include "loss.h"
 #include "runtime_layer.h"
@@ -8,6 +17,7 @@ struct model {
     array<base_layer_runtime*> Layers;
 
     f32 LearningRate;
+    f32 B1, B2; // Exponential decay rates for the moment estimates (:Adam)
 
     loss_function Loss;
 
@@ -18,6 +28,8 @@ struct model {
 // sugar that makes it obvious which parameter we are setting.
 struct hyper_parameters {
     f32 LearningRate;
+    f32 B1, B2; // Exponential decay rates for the moment estimates (:Adam)
+
     loss_function Loss;
 };
 
@@ -42,13 +54,20 @@ inline model compile_model(hyper_parameters h_params)
             // This is ugly.
             // Also I'm not sure if rand() is statistically good enough.
             For(stripe) it = ((f32)rand() / (32767 / 2)) - 1;
+            stripe[0] = 0.0f; // Init bias to zero
         }
+
+        // :Adam
+        l->FirstRawMoment = 0.0f;
+        l->SecondRawMoment = 0.0f;
     });
 
     // Initialize the rest of hyper-parameters
     assert(h_params.Loss.Calculate != null && "Forgot loss function");
     result.Loss = h_params.Loss;
     result.LearningRate = h_params.LearningRate;
+    result.B1 = h_params.B1;
+    result.B2 = h_params.B2;
 
     return result;
 }
@@ -65,10 +84,7 @@ auto feedforward(model m, const decltype(DLR_T<I - 1>::Out)& in)
 {
     auto* l = (DLR_T<I>*)m.Layers[I];
 
-    l->Out.get_row_view<l->Out.R - 1>(1) = dot(l->Weights, in);
-
-    DLR_T<I>::Activation::apply(l->Out); // This applies to the bias term as well but we set it to "1" the next line
-
+    l->Out.get_row_view<l->Out.R - 1>(1) = DLR_T<I>::Activation::apply(dot(l->Weights, in));
     l->Out.row(0) = vecf<N_TRAIN_EXAMPLES_PER_STEP>(1.0f); // Augment the output to account for the bias term
 
     if constexpr (I < ARCHITECTURE_COUNT - 1) {
@@ -106,19 +122,34 @@ void backpropagation(model m, const decltype(DLR_T<I + 1>::DeltaWeighted)& next_
 
 // _I_ is the starting layer index. Since input is at 0, this is normally 1.
 //
+// _t_ is the current time-step (:Adam)
+//
 // :DontCircumventTypechecking
 // We can't directly static_for this because we need the input of the previous layer.
 // See note in feedforward(..).
 template <s64 I>
-void update_weights(model m, const decltype(DLR_T<I - 1>::Out)& in)
+void update_weights(model m, s64 t, const decltype(DLR_T<I - 1>::Out)& in)
 {
     auto* l = (DLR_T<I>*)m.Layers[I];
 
-    auto average_kernel_update = dot(l->Delta, T(in)) / (f32)N_TRAIN_EXAMPLES_PER_STEP;
-    l->Weights -= m.LearningRate * average_kernel_update;
+    auto average_weight_update = dot(l->Delta, T(in)) / (f32)N_TRAIN_EXAMPLES_PER_STEP;
+
+    // :Adam
+    l->FirstRawMoment = m.B1 * l->FirstRawMoment + (1 - m.B1) * average_weight_update;
+    l->SecondRawMoment = m.B2 * l->SecondRawMoment + (1 - m.B2) * (average_weight_update * average_weight_update);
+
+    // We do this bias correction because the first time-steps don't have a moment
+    auto first_moment_bias_corrected = l->FirstRawMoment / (1 - pow(m.B1, t));
+    auto second_moment_bias_corrected = l->SecondRawMoment / (1 - pow(m.B2, t));
+
+    // +1e-07F to avoid division by zero
+    auto coeff = m.LearningRate * first_moment_bias_corrected / (sqrt(second_moment_bias_corrected) + 1e-07F);
+
+    // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+    l->Weights -= m.LearningRate * average_weight_update;
 
     if constexpr (I < ARCHITECTURE_COUNT - 1) {
-        update_weights<I + 1>(m, l->Out);
+        update_weights<I + 1>(m, t, l->Out);
     }
 }
 
@@ -150,15 +181,17 @@ inline void train(model m, s64 epochs)
 
             auto cost = costMatrix.Stripes[0];
             For(range(1, costMatrix.R)) cost += costMatrix.Stripes[it];
-            cost /= (f32)N_TRAIN_EXAMPLES_PER_STEP;
+            cost /= N_TRAIN_EXAMPLES_PER_STEP;
 
-            totalCost += cost;
+            totalCost += cost / m.Batches.Count;
 
             // Calculate cost derivative
             BatchOutputMat d = m.Loss.GetDerivative(*targets, out);
 
             backpropagation<ARCHITECTURE_COUNT - 1>(m, d);
-            update_weights<1>(m, *attributes);
+
+            s64 t = 1 + batch_index + epoch * m.Batches.Count;
+            update_weights<1>(m, t, *attributes);
         }
         fmt::print("{0}/{0} ", m.Batches.Count * N_TRAIN_EXAMPLES_PER_STEP);
         fmt::print("[{:=<{}}] cost: {}\n", "", 40, totalCost);

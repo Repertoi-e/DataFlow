@@ -116,7 +116,7 @@ s32 main()
         X.Data = images;
         X.R = numItems;
         X.C = INPUT_SHAPE;
-        
+
         y.Data = labels;
         y.R = numItems;
         y.C = OUTPUT_NEURONS;
@@ -125,35 +125,6 @@ s32 main()
 
         fmt::print("{} images, {} labels, {} bytes memory used\n", images.Count, labels.Count, Context.TempAllocData.TotalUsed);
     }
-    //
-    // // Here we generate random validation data..
-    // const s64 VAL_SAMPLES = 50;
-    //
-    // stack_array<f32, VAL_SAMPLES * INPUT_SHAPE> val_input;
-    // stack_array<vecf<OUTPUT_NEURONS>, VAL_SAMPLES> val_targets;
-    //
-    // For(range(VAL_SAMPLES))
-    // {
-    //     s32 a = rand() % 2, b = rand() % 2;
-    //
-    //     val_input[it * 2] = (f32)a;
-    //     val_input[it * 2 + 1] = (f32)b;
-    //
-    //     // val_targets[it] = (f32) (a ^ b);
-    // }
-    //
-    // auto predicted = predict(m, val_input);
-    //
-    // s64 score = 0;
-    // For_enumerate(predicted)
-    // {
-    //     For_as(x, it) x = (x > 0.5f) ? 1.0f : 0.0f;
-    //     if (it == val_targets[it_index]) {
-    //         score += 1;
-    //     }
-    // }
-    // fmt::print("{}, accuracy: {}\n", predicted, (f32)score / VAL_SAMPLES);
-    //
 
     return 0;
 }

@@ -2,12 +2,12 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClInclude Include="src\pch.h" />
-    <ClInclude Include="src\model.h" />
-    <ClInclude Include="src\activation.h" />
-    <ClInclude Include="src\dyn_mat.h" />
-    <ClInclude Include="src\loss.h" />
-    <ClInclude Include="src\architecture.h" />
-    <ClInclude Include="src\runtime_layer.h" />
+    <ClInclude Include="src\model\activation.h" />
+    <ClInclude Include="src\model\architecture.h" />
+    <ClInclude Include="src\model\dyn_mat.h" />
+    <ClInclude Include="src\model\loss.h" />
+    <ClInclude Include="src\model\model.h" />
+    <ClInclude Include="src\model\runtime_layer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\pch.cpp" />

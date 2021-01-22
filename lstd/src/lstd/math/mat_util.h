@@ -77,28 +77,34 @@ inline auto operator+(const mat<T, R, C, Packed> &lhs, const mat<U, R, C, Packed
     }
 }
 
+template <any_mat Mat, typename U>
+inline auto operator+(const Mat& lhs, U rhs) { return lhs + Mat(rhs); }
+
+template <any_mat Mat, typename U>
+inline auto operator+(U lhs, const Mat& rhs) { return Mat(lhs) + rhs; }
+
 template <typename T, typename U, s64 R, s64 C, bool Packed>
 inline auto operator-(const mat<T, R, C, Packed> &lhs, const mat<U, R, C, Packed> &rhs) {
     using V = mat_mul_elem_t<T, U>;
 
     if constexpr (R * C == 4) {
         mat<V, R, C, Packed> result;
-        for (s64 i = 0; i < result.R; ++i) {
-            for (s64 j = 0; j < result.C; ++j) {
-                result(i, j) = lhs(i, j) - rhs(i, j);
-            }
-        }
+        For_as(i, range(R)) For_as(j, range(C)) result(i, j) = lhs(i, j) - rhs(i, j);
         return result;
     } else if constexpr (R <= 4 && C <= 4) {
         return impl::small_sub(lhs, rhs, make_integer_sequence<types::decay_t<decltype(lhs)>::StripeCount>{});
     } else {
         mat<V, R, C, Packed> result;
-        for (s64 i = 0; i < result.StripeCount; ++i) {
-            result.Stripes[i] = lhs.Stripes[i] - rhs.Stripes[i];
-        }
+        For(range(result.StripeCount)) result.Stripes[it] = lhs.Stripes[it] - rhs.Stripes[it];
         return result;
     }
 }
+
+template <any_mat Mat, typename U>
+inline auto operator-(const Mat& lhs, U rhs) { return lhs - Mat(rhs); }
+
+template <any_mat Mat, typename U>
+inline auto operator-(U lhs, const Mat& rhs) { return Mat(lhs) - rhs; }
 
 template <typename T, typename U, s64 R, s64 C, bool Packed>
 inline mat<U, R, C, Packed> &operator+=(mat<T, R, C, Packed> &lhs, const mat<U, R, C, Packed> &rhs) {
@@ -106,11 +112,17 @@ inline mat<U, R, C, Packed> &operator+=(mat<T, R, C, Packed> &lhs, const mat<U, 
     return lhs;
 }
 
+template <any_mat Mat, typename U>
+inline auto operator+=(Mat& lhs, U rhs) { return lhs += Mat(rhs); }
+
 template <typename T, typename U, s64 R, s64 C, bool Packed>
 inline mat<U, R, C, Packed> &operator-=(mat<T, R, C, Packed> &lhs, const mat<U, R, C, Packed> &rhs) {
     lhs = lhs - rhs;
     return lhs;
 }
+
+template <any_mat Mat, typename U>
+inline auto operator-=(Mat& lhs, U rhs) { return lhs -= Mat(rhs); }
 
 // Scalar multiplication
 template <typename T, s64 R, s64 C, bool Packed, typename U>
@@ -141,9 +153,7 @@ requires(types::is_convertible<U, T>) mat<T, R, C, Packed> operator/(const mat<T
 }
 
 template <typename T, s64 R, s64 C, bool Packed, typename U>
-requires(types::is_convertible<U, T>) mat<T, R, C, Packed> operator*(U s, const mat<T, R, C, Packed> &m) {
-    return m * s;
-}
+requires(types::is_convertible<U, T>) mat<T, R, C, Packed> operator*(U s, const mat<T, R, C, Packed> &m) { return m * s; }
 
 template <typename T, s64 R, s64 C, bool Packed, typename U>
 requires(types::is_convertible<U, T>) mat<T, R, C, Packed> operator/(U s, const mat<T, R, C, Packed> &m) {

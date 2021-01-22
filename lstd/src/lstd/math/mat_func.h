@@ -368,55 +368,64 @@ T norm(const mat<T, R, C, Packed>& m) {
 
 // Returns the element-wise minimum of arguments
 template <any_mat Mat>
-always_inline Mat element_wise_min(const Mat& lhs, const Mat& rhs)
+always_inline Mat min(const Mat& lhs, const Mat& rhs)
 {
     Mat result = lhs;
-    For(result.Stripes) it = element_wise_min(it);
+    For(range(result.StripeCount)) result.Stripes[it] = min(result.Stripes[it], rhs.Stripes[it]);
     return result;
 }
 
 // Returns the element-wise maximum of arguments
 template <any_mat Mat>
-always_inline Mat element_wise_max(const Mat& lhs, const Mat& rhs)
+always_inline Mat max(const Mat& lhs, const Mat& rhs)
 {
     Mat result = lhs;
-    For(result.Stripes) it = element_wise_max(it);
+    For(range(result.StripeCount)) result.Stripes[it] = max(result.Stripes[it], rhs.Stripes[it]);
     return result;
 }
 
 // Clamps each vector value with specified bounds
 template <any_mat Mat>
-always_inline Mat element_wise_clamp(const Mat& arg, typename vec_info<Mat>::T lower, typename vec_info<Mat>::T upper)
+always_inline Mat clamp(const Mat& arg, typename vec_info<Mat>::T lower, typename vec_info<Mat>::T upper)
 {
     Mat result = arg;
-    For(result.Stripes) it = element_wise_clamp(it);
+    For(result.Stripes) it = clamp(it, lower, upper);
     return result;
 }
 
 // Returns the element-wise log of the matrix
 template <any_mat Mat>
-always_inline Mat element_wise_log(const Mat& mat)
+always_inline Mat log(const Mat& mat)
 {
     Mat result = mat;
-    For(result.Stripes) it = element_wise_log(it);
+    For(result.Stripes) it = log(it);
     return result;
 }
 
 // Returns the element-wise exp of the matrix
 template <any_mat Mat>
-always_inline Mat element_wise_exp(const Mat& mat)
+always_inline Mat exp(const Mat& mat)
 {
     Mat result = mat;
-    For(result.Stripes) it = element_wise_exp(it);
+    For(result.Stripes) it = exp(it);
+    return result;
+}
+
+// Returns the element-wise sqrt of the matrix
+template <any_mat Mat>
+always_inline Mat sqrt(const Mat& mat)
+{
+    Mat result = mat;
+    For(result.Stripes) it = sqrt(it);
     return result;
 }
 
 // Returns the element-wise abs of the matrix
 template <any_mat Mat>
-always_inline Mat element_wise_abs(const Mat& mat)
+always_inline Mat abs(const Mat& mat)
 {
     Mat result = mat;
-    For(result.Stripes) it = element_wise_abs(it);
+    For(result.Stripes) it = abs(it);
     return result;
 }
 
