@@ -225,6 +225,34 @@ struct OPTIMIZATION mat : public mat_data<T, R_, C_, Packed> {
         return mat_view<const mat, SR, SC>(*this, r, c);
     }
 
+    template <s64 SC>
+    mat_view<mat, R, SC> get_column_view(s64 col) {
+        s64 c = translate_index(col, C);
+        assert(SC + c <= C);
+        return mat_view<mat, R, SC>(*this, 0, c);
+    }
+
+    template <s64 SC>
+    mat_view<const mat, R, SC> get_column_view(s64 col) const {
+        s64 c = translate_index(col, C);
+        assert(SC + c <= C);
+        return mat_view<const mat, R, SC>(*this, 0, c);
+    }
+
+    template <s64 SR>
+    mat_view<mat, SR, C> get_row_view(s64 row) {
+        s64 r = translate_index(row, R);
+        assert(SR + r <= R);
+        return mat_view<mat, SR, C>(*this, r, 0);
+    }
+
+    template <s64 SR>
+    mat_view<const mat, SR, C> get_row_view(s64 row) const {
+        s64 r = translate_index(row, R);
+        assert(SR + r <= R);
+        return mat_view<const mat, SR, C>(*this, r, 0);
+    }
+
     auto col(s64 col) { return get_view<R, 1>(0, col); }
     auto row(s64 row) { return get_view<1, C>(row, 0); }
     auto col(s64 col) const { return get_view<R, 1>(0, col); }

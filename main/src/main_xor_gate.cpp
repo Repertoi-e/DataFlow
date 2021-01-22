@@ -1,22 +1,29 @@
 #include "pch.h"
 
-#define INPUT_SHAPE 2
-#define OUTPUT_NEURONS 1
-#define N_TRAIN_EXAMPLES_PER_STEP 4
+#include "architecture.h"
 
-#include "model.h" // Include after #defines above!
+//
+// We define this
+//
 
-auto get_layers()
-{
-    // We can't train an XOR gate without hidden layers because the function is not linearly separable!
-    // constexpr auto architecture = dense_layer_architecture<INPUT_SHAPE, OUTPUT_NEURONS>();
-    constexpr auto architecture = dense_layer_architecture<INPUT_SHAPE, 2, OUTPUT_NEURONS>();
+constexpr s64 N_TRAIN_EXAMPLES_PER_STEP = 1;
 
-    array<base_layer*> layers;
-    append(layers, new dense_layer<architecture[0]>(ActivationSigmoid));
-    append(layers, new dense_layer<architecture[1]>(ActivationSigmoid));
-    return layers;
-}
+constexpr auto ARCHITECTURE = std::make_tuple(
+    input<2> {},
+    dense<2, activation_sigmoid> {},
+    dense<1, activation_sigmoid> {});
+
+//
+// This is infered:
+//
+
+using ARCHITECTURE_T = decltype(ARCHITECTURE);
+constexpr s64 ARCHITECTURE_COUNT = std::tuple_size_v<ARCHITECTURE_T>;
+
+constexpr s64 INPUT_SHAPE = std::tuple_element_t<0, ARCHITECTURE_T>::NUM_NEURONS;
+constexpr s64 OUTPUT_NEURONS = std::tuple_element_t<ARCHITECTURE_COUNT - 1, ARCHITECTURE_T>::NUM_NEURONS;
+
+#include "model.h" // Include this after architecture has been defined. Sadly I don't think there is a way around this!
 
 s32 main()
 {
@@ -48,12 +55,19 @@ s32 main()
     auto input = to_stack_array<f32>(0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f, 1.0f);
     auto targets = to_stack_array<f32>(0.0f, 1.0f, 1.0f, 0.0f);
 
-    model m;
+    dyn_mat X, y;
+    append_pointer_and_size(X.Data, input.Data, input.Count);
+    append_pointer_and_size(y.Data, targets.Data, targets.Count);
+    X.R = input.Count / INPUT_SHAPE;
+    X.C = INPUT_SHAPE;
+    y.R = targets.Count / OUTPUT_NEURONS;
+    y.C = OUTPUT_NEURONS;
 
+    model m;
     WITH_ALLOC(Context.Temp)
     {
-        m = compile_model({ .Layers = get_layers(), .LearningRate = 5.0f, .Loss = BinaryCrossEntropy });
-        fit_model(m, { .X = input, .y = targets, .Epochs = 500 });
+        m = compile_model({ .LearningRate = 5.0f, .Loss = BinaryCrossEntropy });
+        fit(m, { .X = X, .y = y, .Epochs = 500 });
     }
 
     // Here we generate random validation data..
