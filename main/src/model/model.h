@@ -11,14 +11,14 @@ constexpr s64 OUTPUT_NEURONS = std::tuple_element_t<ARCHITECTURE_COUNT - 1, ARCH
 
 #include "dyn_mat.h"
 #include "loss.h"
+#include "optimizer.h"
 #include "runtime_layer.h"
 
+template <typename Optimizer>
 struct model {
     array<base_layer_runtime*> Layers;
 
-    f32 LearningRate;
-    f32 B1, B2; // Exponential decay rates for the moment estimates (:Adam)
-
+    Optimizer Optimizer;
     loss_function Loss;
 
     array<std::tuple<BatchInputMat*, BatchOutputMat*>> Batches;
@@ -26,10 +26,7 @@ struct model {
 
 // This is used for an argument to _compile_model_ for a nice syntactic
 // sugar that makes it obvious which parameter we are setting.
-struct hyper_parameters {
-    f32 LearningRate;
-    f32 B1, B2; // Exponential decay rates for the moment estimates (:Adam)
-
+struct compile_model_params {
     loss_function Loss;
 };
 
@@ -37,9 +34,10 @@ struct hyper_parameters {
 // - Allocates the runtime layers using the specified architecture.
 // - Initializes weights (currently there is no way to do custom weight-initialization @TODO!)
 // - Sets up the specified hyper-parameters.
-inline model compile_model(hyper_parameters h_params)
+template <typename Optimizer>
+auto compile_model(Optimizer optimizer, compile_model_params params)
 {
-    model result;
+    model<Optimizer> result;
 
     auto layers = get_layers_from_architecture();
     result.Layers = layers;
@@ -56,18 +54,13 @@ inline model compile_model(hyper_parameters h_params)
             For(stripe) it = ((f32)rand() / (32767 / 2)) - 1;
             stripe[0] = 0.0f; // Init bias to zero
         }
-
-        // :Adam
-        l->FirstRawMoment = 0.0f;
-        l->SecondRawMoment = 0.0f;
     });
 
+    result.Optimizer = optimizer;
+
     // Initialize the rest of hyper-parameters
-    assert(h_params.Loss.Calculate != null && "Forgot loss function");
-    result.Loss = h_params.Loss;
-    result.LearningRate = h_params.LearningRate;
-    result.B1 = h_params.B1;
-    result.B2 = h_params.B2;
+    assert(params.Loss.Calculate != null && "Forgot loss function");
+    result.Loss = params.Loss;
 
     return result;
 }
@@ -80,15 +73,15 @@ inline model compile_model(hyper_parameters h_params)
 // compiled this is unrolled (the result is every layer operating inlined directly one after the other),
 // so the compiler has extra opportunity for optimization.
 template <s64 I>
-auto feedforward(model m, const decltype(DLR_T<I - 1>::Out)& in)
+auto feedforward(array<base_layer_runtime*> layers, const decltype(DLR_T<I - 1>::Out)& in)
 {
-    auto* l = (DLR_T<I>*)m.Layers[I];
+    auto* l = (DLR_T<I>*)layers[I];
 
     l->Out.get_row_view<l->Out.R - 1>(1) = DLR_T<I>::Activation::apply(dot(l->Weights, in));
     l->Out.row(0) = vecf<N_TRAIN_EXAMPLES_PER_STEP>(1.0f); // Augment the output to account for the bias term
 
     if constexpr (I < ARCHITECTURE_COUNT - 1) {
-        return feedforward<I + 1>(m, l->Out);
+        return feedforward<I + 1>(layers, l->Out);
     } else {
         return l->Out.get_row_view<l->Out.R - 1>(1); // We return the output without the bias
     }
@@ -101,9 +94,9 @@ auto feedforward(model m, const decltype(DLR_T<I - 1>::Out)& in)
 // We can't directly static_for this because we need the weighted delta of the next layer.
 // See note in feedforward(..).
 template <s64 I>
-void backpropagation(model m, const decltype(DLR_T<I + 1>::DeltaWeighted)& next_layer_delta_weighted)
+void backpropagation(array<base_layer_runtime*> layers, const decltype(DLR_T<I + 1>::DeltaWeighted)& next_layer_delta_weighted)
 {
-    auto* l = (DLR_T<I>*)m.Layers[I];
+    auto* l = (DLR_T<I>*)layers[I];
 
     // If this is the final layer _next_layer_delta_weighted_ points to the derivative
     // of the loss function, otherwise it points to next layer's _DeltaWeighted_.
@@ -116,45 +109,32 @@ void backpropagation(model m, const decltype(DLR_T<I + 1>::DeltaWeighted)& next_
 
     // Input is at layer 0, we stop at layer 1.
     if constexpr (I > 1) {
-        backpropagation<I - 1>(m, l->DeltaWeighted);
+        backpropagation<I - 1>(layers, l->DeltaWeighted);
     }
 }
 
 // _I_ is the starting layer index. Since input is at 0, this is normally 1.
 //
-// _t_ is the current time-step (:Adam)
-//
 // :DontCircumventTypechecking
 // We can't directly static_for this because we need the input of the previous layer.
 // See note in feedforward(..).
-template <s64 I>
-void update_weights(model m, s64 t, const decltype(DLR_T<I - 1>::Out)& in)
+template <s64 I, typename Optimizer>
+void update_weights(model<Optimizer> m, const decltype(DLR_T<I - 1>::Out)& in)
 {
     auto* l = (DLR_T<I>*)m.Layers[I];
 
-    auto average_weight_update = dot(l->Delta, T(in)) / (f32)N_TRAIN_EXAMPLES_PER_STEP;
-
-    // :Adam
-    l->FirstRawMoment = m.B1 * l->FirstRawMoment + (1 - m.B1) * average_weight_update;
-    l->SecondRawMoment = m.B2 * l->SecondRawMoment + (1 - m.B2) * (average_weight_update * average_weight_update);
-
-    // We do this bias correction because the first time-steps don't have a moment
-    auto first_moment_bias_corrected = l->FirstRawMoment / (1.0f - pow(m.B1, t));
-    auto second_moment_bias_corrected = l->SecondRawMoment / (1.0f - pow(m.B2, t));
-
-    // +1e-07F to avoid division by zero
-    auto coeff = m.LearningRate * first_moment_bias_corrected / (sqrt(second_moment_bias_corrected) + 1e-07F);
-
-    l->Weights -= coeff * average_weight_update;
+    auto gradients = dot(l->Delta, T(in)) / (f32)N_TRAIN_EXAMPLES_PER_STEP;
+    m.Optimizer.update_weights(l, gradients);
 
     if constexpr (I < ARCHITECTURE_COUNT - 1) {
-        update_weights<I + 1>(m, t, l->Out);
+        update_weights<I + 1>(m, l->Out);
     }
 }
 
 // This is called by _fit()_.
 // Trains the model for a number of epochs given the already calculated batches.
-inline void train(model m, s64 epochs)
+template <typename Optimizer>
+void train(model<Optimizer> m, s64 epochs)
 {
     For_as(epoch, range(epochs))
     {
@@ -170,7 +150,7 @@ inline void train(model m, s64 epochs)
 
             auto [attributes, targets] = batch;
 
-            auto out = feedforward<1>(m, *attributes);
+            auto out = feedforward<1>(m.Layers, *attributes);
 
             // Calculate losses
             BatchOutputMat losses = m.Loss.Calculate(*targets, out);
@@ -187,10 +167,9 @@ inline void train(model m, s64 epochs)
             // Calculate cost derivative
             BatchOutputMat d = m.Loss.GetDerivative(*targets, out);
 
-            backpropagation<ARCHITECTURE_COUNT - 1>(m, d);
+            backpropagation<ARCHITECTURE_COUNT - 1>(m.Layers, d);
 
-            s64 t = 1 + batch_index + epoch * m.Batches.Count;
-            update_weights<1>(m, t, *attributes);
+            update_weights<1>(m, *attributes);
         }
         fmt::print("{0}/{0} ", m.Batches.Count * N_TRAIN_EXAMPLES_PER_STEP);
         fmt::print("[{:=<{}}] cost: {}\n", "", 40, totalCost);
@@ -207,7 +186,8 @@ struct fit_model_parameters {
 // Takes X and y and splits them into batches.
 // Each batch has _N_TRAIN_EXAMPLES_PER_STEP_ elements (see note in this function's body).
 // Also calls _train()_ with the specified number of epochs.
-inline void fit(model m, fit_model_parameters params)
+template <typename Optimizer>
+void fit(model<Optimizer> m, fit_model_parameters params)
 {
     assert(params.X.R == params.y.R && "Different number of examples in X and y");
 
@@ -308,7 +288,8 @@ inline void fit(model m, fit_model_parameters params)
 // with Python (that's why I have just hacked this thing and haven't given it enough attention yet).
 // We can just give the weights to numpy and deploy the model that way. This library's sole purpose
 // is just to speed up the training process of the model.
-inline array<vecf<OUTPUT_NEURONS>> predict(model m, array_view<f32> X)
+template <typename Optimizer>
+array<vecf<OUTPUT_NEURONS>> predict(model<Optimizer> m, array_view<f32> X)
 {
     assert(X.Count % INPUT_SHAPE == 0 && "Bad X shape");
 

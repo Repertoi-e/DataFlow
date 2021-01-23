@@ -86,9 +86,12 @@ struct dense_layer_runtime : base_layer_runtime {
     // It is calculated by just dot(T(Weights), Delta).
     matf<NUM_INPUTS, N_TRAIN_EXAMPLES_PER_STEP> DeltaWeighted;
 
-    // Used by Adam optimizer:
-    matf<NUM_NEURONS, NUM_INPUTS + 1> FirstRawMoment;
-    matf<NUM_NEURONS, NUM_INPUTS + 1> SecondRawMoment;
+    // Used by optimizers. SGD with momentum uses just one, Adam uses both.
+    matf<NUM_NEURONS, NUM_INPUTS + 1> FirstRawMoment = 0.0f;
+    matf<NUM_NEURONS, NUM_INPUTS + 1> SecondRawMoment = 0.0f;
+
+    // Adam increments this after each weight update
+    s64 TimeStep = 1;
 };
 
 template <s64 I>
@@ -141,4 +144,3 @@ auto get_layers_from_architecture()
     });
     return layers;
 }
-
